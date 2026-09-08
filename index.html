@@ -173,7 +173,9 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
   .strips{display:grid;grid-template-columns:repeat(2,1fr)}
   .strip{border:1px dashed #888;padding:5mm 5mm 4mm;break-inside:avoid;page-break-inside:avoid}
   .strip .who{font-family:'Barlow Condensed',sans-serif;font-weight:700;
-    font-size:var(--nameSize,19pt);line-height:1.1;margin:0 0 1mm}
+    font-size:var(--nameSize,19pt);line-height:1.1;margin:0 0 .5mm}
+  .strip .deck{font-family:'Barlow Condensed',sans-serif;font-weight:700;
+    font-size:10.5pt;letter-spacing:.08em;margin:0 0 1mm}
   .strip .meta{font-size:8.5pt;color:#444;margin:0 0 2.5mm;
     border-bottom:1px solid #bbb;padding-bottom:1.5mm}
   .strip .nums{display:grid;grid-template-columns:repeat(var(--numCols,3),1fr);
@@ -873,6 +875,8 @@ function apportion(total,weights){
 }
 
 let plan=null;
+const deckOf = n => Math.floor(n/1000);
+
 function buildPlan(){
   const people=namedCrew().map(c=>({...c}));
   const N=people.length;
@@ -898,23 +902,79 @@ function buildPlan(){
   }
   if(!poolIdx.length){ plan={people,lists,targets}; render(); return; }
 
-  const poolUnits=pool.reduce((s,c)=>s+weightOf(c.type),0);
-  const weights=computeTargets(poolUnits, poolIdx.map(i=>capOf(people[i])));
-  poolIdx.forEach((i,j)=>targets[i]=Math.round(weights[j]));
-
   const groupOf=c=>c.type==="window"?"window":c.type==="lux"?"lux":"inside";
-  const totals={window:0,inside:0,lux:0};
-  pool.forEach(c=>totals[groupOf(c)]++);
-  const quota={};
-  ["window","inside","lux"].forEach(g=>quota[g]=apportion(totals[g],weights));
+  const poolUnits=pool.reduce((s,c)=>s+weightOf(c.type),0);
+  const globalT=computeTargets(poolUnits, poolIdx.map(i=>capOf(people[i])));
+  const avgT=poolUnits/poolIdx.length;
 
-  pool.forEach(c=>{
-    const g=groupOf(c);
-    for(let j=0;j<poolIdx.length;j++){
-      if(quota[g][j]>0){ quota[g][j]--; lists[poolIdx[j]].push(c); return; }
-    }
-    lists[poolIdx[poolIdx.length-1]].push(c);
+  // one deck per group of crew — nobody should be sent up and down stairs
+  let decks=[];
+  [...new Set(pool.map(c=>deckOf(c.n)))].sort((a,b)=>a-b).forEach(d=>{
+    const cs=pool.filter(c=>deckOf(c.n)===d);
+    decks.push({decks:[d], cabins:cs, units:cs.reduce((s,c)=>s+weightOf(c.type),0)});
   });
+  // a deck with too few cabins to keep one person busy joins its neighbour —
+  // this is the only case where somebody works two decks
+  for(let i=0;i<decks.length&&decks.length>1;i++){
+    if(decks[i].units < avgT*0.6){
+      const j = i>0 ? i-1 : 1;
+      decks[j].cabins=decks[j].cabins.concat(decks[i].cabins).sort((a,b)=>a.n-b.n);
+      decks[j].units+=decks[i].units;
+      decks[j].decks=[...new Set([...decks[j].decks,...decks[i].decks])].sort();
+      decks.splice(i,1); i=-1;
+    }
+  }
+
+  // hand the crew out to the decks in order, by how much work each deck holds
+  const groups=decks.map(()=>[]);
+  let ci=0;
+  decks.forEach((dk,di)=>{
+    const left=decks.length-di-1;
+    if(di===decks.length-1){ while(ci<poolIdx.length) groups[di].push(poolIdx[ci++]); return; }
+    let need=dk.units;
+    while(ci<poolIdx.length-left){
+      const t=globalT[ci]||avgT;
+      if(groups[di].length && need < t*0.5) break;
+      groups[di].push(poolIdx[ci]); need-=t; ci++;
+    }
+    if(!groups[di].length && ci<poolIdx.length-left) groups[di].push(poolIdx[ci++]);
+  });
+
+  // split each deck among its own crew, window and inside evenly
+  decks.forEach((dk,di)=>{
+    const g=groups[di];
+    if(!g.length) return;
+    const w=computeTargets(dk.units, g.map(i=>capOf(people[i])));
+    g.forEach((i,j)=>targets[i]=Math.round(w[j]));
+    const totals={window:0,inside:0,lux:0};
+    dk.cabins.forEach(c=>totals[groupOf(c)]++);
+
+    let quota;
+    if(!totals.lux){
+      // decide how many cabins each person gets first, then how many of those
+      // have windows — so the rounding can never push anyone over their cap
+      const per=apportion(dk.cabins.length, w);
+      const win=apportion(totals.window, per.map(v=>v||0.001));
+      per.forEach((v,j)=>{ if(win[j]>v) win[j]=v; });
+      let short=totals.window-win.reduce((a,b)=>a+b,0);
+      for(let pass=0; short>0 && pass<dk.cabins.length; pass++){
+        for(let j=0;j<per.length&&short>0;j++) if(win[j]<per[j]){ win[j]++; short--; }
+      }
+      quota={window:win, inside:per.map((v,j)=>v-win[j]), lux:per.map(()=>0)};
+    } else {
+      quota={};
+      ["window","inside","lux"].forEach(k=>quota[k]=apportion(totals[k],w));
+    }
+
+    dk.cabins.forEach(c=>{
+      const k=groupOf(c);
+      for(let j=0;j<g.length;j++){
+        if(quota[k][j]>0){ quota[k][j]--; lists[g[j]].push(c); return; }
+      }
+      lists[g[g.length-1]].push(c);
+    });
+  });
+
   plan={people,lists,targets};
   render();
 }
@@ -940,9 +1000,11 @@ function render(){
     const i=list.filter(c=>c.type==="inside"||c.type==="unknown").length;
     const l=list.filter(c=>c.type==="lux").length;
     const t=plan.targets[idx];
+    const decks=[...new Set(list.map(c=>deckOf(c.n)))].sort();
     const foot=document.createElement("div");
     foot.className="foot";
     foot.innerHTML=`<b>${esc(p.name)}</b>
+      <small class="${decks.length>1?"off":""}">${decks.length?"Deck "+decks.join(" + "):"—"}</small>
       <small class="${Math.abs(list.length-t)>1?"off":""}">${list.length} of ${t}</small>
       <small>${w}w ${i}i${l?" "+l+"L":""}</small>`;
     col.appendChild(foot);
@@ -998,8 +1060,10 @@ function buildPrint(){
     const w=list.filter(c=>c.type==="window").length;
     const ins=list.filter(c=>c.type!=="window"&&c.type!=="lux").length;
     const lx=list.filter(c=>c.type==="lux").length;
+    const decks=[...new Set(list.map(c=>deckOf(c.n)))].sort();
     h+=`<div class="strip">
       <p class="who">${esc(p.name)}</p>
+      <p class="deck">${decks.length?"DECK "+decks.join(" + "):""}</p>
       <p class="meta">${esc(voyageLine())}</p>
       <div class="nums">${list.map(c=>`<span class="${c.type==="lux"?"lx":""}">${c.n}</span>`).join("")}</div>
       <p class="tot">${list.length} cabins &nbsp;·&nbsp; ${w} window, ${ins} inside${lx?", "+lx+" lux":""}</p>
