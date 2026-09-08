@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cabin Split — Norröna</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --sea-900:#0d1b2a;
+  --sea-800:#12263a;
+  --sea-700:#183149;
+  --line:#264866;
+  --text:#e8f0f8;
+  --muted:#93aac1;
+  --win:#4fd1c5;
+  --ins:#8fa3ba;
+  --lux:#e3b45f;
+  --unk:#e07a5f;
+  --action:#2f96d8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:
+    radial-gradient(1100px 620px at 82% -12%, #1c3d5c 0%, transparent 62%),
+    radial-gradient(900px 500px at -10% 8%, #14324a 0%, transparent 58%),
+    var(--sea-900);
+  background-attachment:fixed;
+  color:var(--text);
+  font-family:'Barlow',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1500px;margin:0 auto;padding:28px 22px 80px}
+
+/* header */
+.masthead{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:26px}
+h1{font-family:'Barlow Condensed','Barlow',sans-serif;font-weight:600;
+  font-size:clamp(30px,5vw,46px);line-height:1;letter-spacing:.01em;margin:0}
+.masthead p{margin:0 0 4px;color:var(--muted);max-width:52ch}
+
+/* panels */
+.panel{background:rgba(18,38,58,.72);border:1px solid var(--line);border-radius:12px;
+  padding:20px 22px;margin-bottom:18px;backdrop-filter:blur(8px)}
+.panel h2{font-family:'Barlow Condensed','Barlow',sans-serif;font-weight:600;
+  font-size:22px;margin:0 0 4px;letter-spacing:.01em}
+.panel .hint{color:var(--muted);font-size:14px;margin:0 0 16px}
+
+/* drop zone */
+#drop{border:1.5px dashed var(--line);border-radius:10px;padding:34px 20px;text-align:center;
+  cursor:pointer;transition:border-color .15s,background .15s}
+#drop:hover,#drop.over{border-color:var(--action);background:rgba(47,150,216,.08)}
+#drop strong{display:block;font-size:18px;margin-bottom:4px}
+#drop span{color:var(--muted);font-size:14px}
+#drop.done{border-style:solid;border-color:var(--win);background:rgba(79,209,197,.07)}
+
+/* voyage strip */
+.voyage{display:flex;gap:26px;flex-wrap:wrap;align-items:baseline;margin-top:18px;
+  padding-top:16px;border-top:1px solid var(--line)}
+.voyage div{display:flex;flex-direction:column;gap:1px}
+.voyage b{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.voyage small{color:var(--muted);font-size:12.5px}
+
+/* counts */
+.tally{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.tally span{border:1px solid var(--line);border-radius:999px;padding:4px 13px;font-size:13.5px;
+  font-variant-numeric:tabular-nums}
+.tally .w{border-color:var(--win);color:var(--win)}
+.tally .i{border-color:var(--ins);color:var(--ins)}
+.tally .l{border-color:var(--lux);color:var(--lux)}
+.tally .u{border-color:var(--unk);color:var(--unk)}
+
+/* forms */
+label{display:block;font-size:13.5px;color:var(--muted);margin-bottom:5px}
+textarea,input[type=number],input[type=text]{
+  width:100%;background:var(--sea-900);color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:9px 11px;font-family:inherit;font-size:15px}
+textarea{min-height:132px;resize:vertical;line-height:1.55}
+input:focus,textarea:focus,button:focus-visible,#drop:focus-visible{
+  outline:2px solid var(--action);outline-offset:2px}
+.grid2{display:grid;grid-template-columns:1fr 260px;gap:20px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+button{font-family:inherit;font-size:15px;font-weight:500;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:var(--sea-700);color:var(--text);padding:9px 16px}
+button:hover{border-color:var(--action)}
+button.primary{background:var(--action);border-color:var(--action);color:#04121d;font-weight:600}
+button.primary:hover{background:#4aa9e4}
+button:disabled{opacity:.42;cursor:not-allowed}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mt{margin-top:16px}
+
+/* unknown cabins */
+.warn{border:1px solid var(--unk);background:rgba(224,122,95,.09);border-radius:10px;
+  padding:14px 16px;margin-top:16px;font-size:14px}
+.warn .row{margin-top:10px}
+.chipbtn{border:1px solid var(--line);background:transparent;padding:3px 10px;font-size:13px}
+
+/* board */
+.board{display:flex;gap:9px;overflow-x:auto;padding-bottom:8px;align-items:flex-start}
+.crew{flex:0 0 96px;border:1px solid var(--line);border-radius:9px;overflow:hidden;
+  background:rgba(13,27,42,.6);display:flex;flex-direction:column}
+.crew.over{border-color:var(--action);background:rgba(47,150,216,.12)}
+.crew .cabins{display:flex;flex-direction:column;min-height:60px}
+.cab{font-variant-numeric:tabular-nums;text-align:center;padding:3px 0;font-size:14.5px;
+  border-bottom:1px solid rgba(38,72,102,.55);cursor:grab;user-select:none}
+.cab:last-child{border-bottom:none}
+.cab.window{color:var(--win)}
+.cab.inside{color:var(--ins)}
+.cab.lux{color:var(--lux);font-weight:600}
+.cab.unknown{color:var(--unk)}
+.cab.dragging{opacity:.35}
+.crew .foot{margin-top:auto;border-top:1px solid var(--line);padding:6px 4px 7px;text-align:center;
+  background:rgba(24,49,73,.75)}
+.crew .foot b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.crew .foot small{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.crew .foot small.off{color:var(--unk)}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+
+details{border-top:1px solid var(--line);margin-top:22px;padding-top:14px}
+summary{cursor:pointer;color:var(--muted);font-size:14px}
+details .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+@media(max-width:760px){details .grid3{grid-template-columns:1fr}}
+.hidden{display:none}
+#status{font-size:14px;color:var(--muted);margin-top:12px;min-height:20px}
+
+/* print */
+#sheet{display:none}
+@media print{
+  @page{size:A4 landscape;margin:9mm}
+  body{background:#fff;color:#000}
+  .wrap>*:not(#sheet){display:none!important}
+  #sheet{display:block}
+  #sheet h3{font-family:'Barlow Condensed',sans-serif;font-size:15pt;margin:0 0 2mm}
+  #sheet .sub{font-size:9pt;margin:0 0 3mm}
+  #sheet table{border-collapse:collapse;width:100%}
+  #sheet td{border:.4pt solid #333;text-align:center;font-size:8.5pt;padding:.6mm 0;
+    font-variant-numeric:tabular-nums}
+  #sheet td.name{font-weight:700;font-size:8.5pt;background:#eee}
+  #sheet td.lux{font-weight:700}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <h1>Cabin split</h1>
+    <p>Load the cleaning list from the booking system, say who is on today, and get an even split of window and inside cabins per crew.</p>
+  </header>
+
+  <section class="panel">
+    <h2>1 · The cleaning list</h2>
+    <p class="hint">Drop in the PDF you get from the booking system. Only the cabin column is read.</p>
+    <div id="drop" tabindex="0" role="button">
+      <strong>Drop the PDF here</strong>
+      <span>or click to choose a file</span>
+    </div>
+    <input type="file" id="file" accept="application/pdf" class="hidden">
+    <div id="status"></div>
+
+    <div id="voyage" class="voyage hidden"></div>
+    <div id="tally" class="tally hidden"></div>
+    <div id="unknown" class="warn hidden"></div>
+
+    <details>
+      <summary>No text in the PDF? Type the cabin numbers instead</summary>
+      <div class="mt">
+        <textarea id="manual" placeholder="5001 5003 5004 5007 …  (spaces, commas or line breaks)"></textarea>
+        <div class="row mt"><button id="useManual">Use these cabins</button></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2>2 · Who is cleaning</h2>
+    <p class="hint">One name per line. The order matters — the list runs from deck 5 forward, so the first name gets the lowest cabins.</p>
+    <div class="grid2">
+      <div>
+        <label for="names">Crew</label>
+        <textarea id="names" placeholder="Angelo&#10;Hellen&#10;Erlito&#10;…"></textarea>
+      </div>
+      <div>
+        <label for="luxCount">Crew on lux cabins only</label>
+        <input type="number" id="luxCount" min="0" value="0">
+        <p class="hint mt" id="luxHint" style="margin-bottom:0">A lux cabin counts as two, so these crew get fewer cabins. They are taken from the bottom of your list.</p>
+      </div>
+    </div>
+    <div class="row mt">
+      <button class="primary" id="build" disabled>Split the cabins</button>
+      <span id="perCrew" style="color:var(--muted);font-size:14px"></span>
+    </div>
+  </section>
+
+  <section class="panel hidden" id="resultPanel">
+    <h2>3 · Today's split</h2>
+    <p class="hint">Drag any cabin to another crew if you need to adjust it. A count in orange means that crew is off the average.</p>
+    <div class="board" id="board"></div>
+    <div class="legend">
+      <span><i style="background:var(--win)"></i>Window</span>
+      <span><i style="background:var(--ins)"></i>Inside</span>
+      <span><i style="background:var(--lux)"></i>Lux (counts as two)</span>
+      <span><i style="background:var(--unk)"></i>Not in any range</span>
+    </div>
+    <div class="row mt">
+      <button class="primary" id="print">Print the split</button>
+      <button id="copy">Copy as a table</button>
+      <button id="csv">Download for Excel</button>
+      <span id="copied" style="color:var(--win);font-size:14px"></span>
+    </div>
+  </section>
+
+  <details class="panel" id="rangePanel">
+    <summary>Cabin ranges used to tell window from inside</summary>
+    <div class="grid3">
+      <div>
+        <label for="rWin">Window cabins</label>
+        <textarea id="rWin"></textarea>
+      </div>
+      <div>
+        <label for="rIns">Cabins without windows</label>
+        <textarea id="rIns"></textarea>
+      </div>
+      <div>
+        <label for="rLux">Lux cabins, deck 8</label>
+        <textarea id="rLux"></textarea>
+      </div>
+    </div>
+    <div class="row mt">
+      <button id="saveRanges">Save ranges</button>
+      <button id="resetRanges">Back to the original list</button>
+      <span id="rangeMsg" style="color:var(--win);font-size:14px"></span>
+    </div>
+  </details>
+
+  <div id="sheet"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- storage that never breaks the page ---------- */
+const store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+};
+
+/* ---------- cabin ranges ---------- */
+const DEFAULT_RANGES = {
+  window:"5001-5016, 5101-5116, 6001-6016, 6101-6116, 6201-6216, 6301-6316, 7001-7004, 7101-7104, 7201-7216, 7301-7312, 7501-7509, 7512, 8001-8016, 8101-8116",
+  inside:"5017-5032, 5117-5133, 6017-6036, 6117-6136, 6217-6224, 6317-6322, 7026-7027, 7127, 7217-7239, 7313-7320, 8017-8032, 8117-8132",
+  lux:"8201-8211, 8301-8311, 8401-8407, 8501-8507"
+};
+let RANGES = {
+  window: store.get("cs_window") || DEFAULT_RANGES.window,
+  inside: store.get("cs_inside") || DEFAULT_RANGES.inside,
+  lux:    store.get("cs_lux")    || DEFAULT_RANGES.lux
+};
+const extra = {}; // manual overrides for unknown cabins, this session only
+
+function parseRanges(str){
+  const out=[];
+  str.split(/[,;\n]+/).forEach(part=>{
+    const t=part.trim(); if(!t) return;
+    const m=t.match(/^(\d{4})\s*[-–]\s*(\d{4})$/);
+    if(m) out.push([+m[1],+m[2]]);
+    else if(/^\d{4}$/.test(t)) out.push([+t,+t]);
+  });
+  return out;
+}
+function classify(n){
+  if(extra[n]) return extra[n];
+  for(const key of ["lux","window","inside"]){
+    for(const [a,b] of parseRanges(RANGES[key])) if(n>=a&&n<=b) return key;
+  }
+  return "unknown";
+}
+const weight = t => t==="lux" ? 2 : 1;
+
+/* ---------- state ---------- */
+let cabins = [];      // [{n,type}]
+let voyage = {};
+let plan = null;      // {names, lists:[[cabin,…],…], luxFrom}
+
+/* ---------- PDF reading ---------- */
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+const $ = id => document.getElementById(id);
+const statusEl = $("status");
+
+async function readPdf(file){
+  statusEl.textContent = "Reading " + file.name + " …";
+  if(!window.pdfjsLib){
+    statusEl.textContent = "The PDF reader did not load. Check the connection, or type the cabin numbers below.";
+    return;
+  }
+  let doc;
+  try{
+    const buf = await file.arrayBuffer();
+    doc = await pdfjsLib.getDocument({data:buf}).promise;
+  }catch(err){
+    statusEl.textContent = "That file could not be opened as a PDF.";
+    return;
+  }
+
+  const found = new Map();
+  let ignored = 0, header = "";
+
+  for(let p=1; p<=doc.numPages; p++){
+    const page = await doc.getPage(p);
+    const tc = await page.getTextContent();
+    const items = [];
+    tc.items.forEach(it=>{
+      const s = (it.str||"").trim();
+      if(!s) return;
+      const x = it.transform[4];
+      if(/^[5-8]\d{3}$/.test(s)) items.push({n:+s, x});
+      else s.split(/[\s,;]+/).forEach(tok=>{ if(/^[5-8]\d{3}$/.test(tok)) items.push({n:+tok, x, loose:true}); });
+    });
+    if(p===1) header = tc.items.map(i=>i.str).join(" ");
+
+    // the cabin column is the tightest, busiest x position on the page;
+    // numbers written inside comments sit somewhere else and are dropped
+    const bins = new Map();
+    items.forEach(i=>{ const k=Math.round(i.x/6); bins.set(k,(bins.get(k)||0)+1); });
+    let bestK=null,bestC=0;
+    bins.forEach((c,k)=>{ if(c>bestC){bestC=c;bestK=k;} });
+
+    items.forEach(i=>{
+      const inColumn = bestC>=5 ? Math.abs(i.x - bestK*6) <= 9 : true;
+      if(inColumn) found.set(i.n,true); else ignored++;
+    });
+  }
+
+  const dep = header.match(/Departure from\s*:?\s*([A-Z]{2,4})/);
+  const arr = header.match(/Arrival to\s*:?\s*([A-Z]{2,4})/);
+  const dt  = header.match(/(\d{2}\.\d{2}\.\d{4})\s*\/\s*(\d{2}\.\d{2})/);
+  voyage = {
+    from: dep?dep[1]:"", to: arr?arr[1]:"",
+    date: dt?dt[1]:"", time: dt?dt[2]:"", file:file.name
+  };
+
+  setCabins([...found.keys()]);
+  statusEl.textContent = cabins.length
+    ? cabins.length + " cabins read from " + doc.numPages + " pages" + (ignored ? " · " + ignored + " numbers in other columns skipped" : "")
+    : "No cabin numbers found. The PDF may be a scan — type the numbers below instead.";
+  $("drop").classList.toggle("done", cabins.length>0);
+}
+
+function setCabins(list){
+  cabins = list.map(Number).filter(n=>n>=5000&&n<=8999)
+               .sort((a,b)=>a-b)
+               .map(n=>({n, type:classify(n)}));
+  showSummary();
+}
+
+/* ---------- summary ---------- */
+function counts(){
+  const c={window:0,inside:0,lux:0,unknown:0};
+  cabins.forEach(x=>c[x.type]++);
+  return c;
+}
+function showSummary(){
+  const v=$("voyage"), t=$("tally"), u=$("unknown");
+  if(!cabins.length){ v.classList.add("hidden"); t.classList.add("hidden"); u.classList.add("hidden"); return; }
+
+  if(voyage.date){
+    v.className="voyage";
+    v.innerHTML =
+      `<div><b>${voyage.from||"?"} → ${voyage.to||"?"}</b><small>Route</small></div>
+       <div><b>${voyage.date}</b><small>Departure${voyage.time?" "+voyage.time:""}</small></div>
+       <div><b>${cabins.length}</b><small>Cabins to clean</small></div>`;
+  } else v.classList.add("hidden");
+
+  const c=counts();
+  t.className="tally";
+  t.innerHTML =
+    `<span class="w">${c.window} with windows</span>
+     <span class="i">${c.inside} without windows</span>` +
+    (c.lux?`<span class="l">${c.lux} lux · counts as ${c.lux*2}</span>`:"") +
+    (c.unknown?`<span class="u">${c.unknown} unrecognised</span>`:"") +
+    `<span>${c.window+c.inside+c.unknown+c.lux*2} units of work</span>`;
+
+  if(c.unknown){
+    const list = cabins.filter(x=>x.type==="unknown").map(x=>x.n);
+    u.className="warn";
+    u.innerHTML = `<b>${list.length} cabin${list.length>1?"s are":" is"} not in any of your ranges:</b> ${list.join(", ")}.
+      They will be split like inside cabins unless you say otherwise.
+      <div class="row" id="fixRow"></div>`;
+    const row=$("fixRow");
+    ["window","inside","lux"].forEach(kind=>{
+      const b=document.createElement("button");
+      b.className="chipbtn";
+      b.textContent = kind==="window" ? "All have windows" : kind==="inside" ? "All are inside" : "All are lux";
+      b.onclick=()=>{ list.forEach(n=>extra[n]=kind); setCabins(cabins.map(x=>x.n)); };
+      row.appendChild(b);
+    });
+  } else u.classList.add("hidden");
+
+  suggestLux();
+  refreshBuild();
+}
+
+function crewNames(){
+  return $("names").value.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+}
+function suggestLux(){
+  const names=crewNames(), c=counts();
+  if(!names.length || !c.lux) return;
+  const units = c.window+c.inside+c.unknown+c.lux*2;
+  const per = units/names.length;
+  const s = Math.max(0, Math.min(names.length-1, Math.round(c.lux*2/per)));
+  if(!$("luxCount").dataset.touched) $("luxCount").value = s;
+}
+function refreshBuild(){
+  const names=crewNames();
+  $("build").disabled = !(cabins.length && names.length);
+  if(cabins.length && names.length){
+    const c=counts();
+    const units=c.window+c.inside+c.unknown+c.lux*2;
+    $("perCrew").textContent = "About " + (units/names.length).toFixed(1) + " units each across " + names.length + " crew.";
+  } else $("perCrew").textContent = "";
+}
+
+/* ---------- the split ---------- */
+function splitEven(total, parts){
+  const base=Math.floor(total/parts), rem=total%parts;
+  return Array.from({length:parts},(_,i)=>base+(i<rem?1:0));
+}
+
+function buildPlan(){
+  const names=crewNames();
+  const N=names.length;
+  const luxCrew=Math.max(0, Math.min(N-1, parseInt($("luxCount").value,10)||0));
+  const lists=names.map(()=>[]);
+
+  const lux=cabins.filter(c=>c.type==="lux");
+  const main=cabins.filter(c=>c.type!=="lux");
+
+  let sweep=main, mainCount=N-luxCrew;
+
+  if(luxCrew>0 && lux.length){
+    const per=splitEven(lux.length, luxCrew);
+    let i=0;
+    for(let k=0;k<luxCrew;k++) for(let j=0;j<per[k];j++) lists[N-luxCrew+k].push(lux[i++]);
+  } else {
+    sweep=cabins; mainCount=N;
+  }
+
+  // even quota of each kind per crew, then walk the ship from bow to stern
+  const groupOf = c => c.type==="window" ? "window" : c.type==="lux" ? "lux" : "inside";
+  const totals={window:0,inside:0,lux:0};
+  sweep.forEach(c=>totals[groupOf(c)]++);
+  const quota={};
+  ["window","inside","lux"].forEach(g=>quota[g]=splitEven(totals[g], mainCount));
+
+  sweep.forEach(c=>{
+    const g=groupOf(c);
+    for(let i=0;i<mainCount;i++){
+      if(quota[g][i]>0){ quota[g][i]--; lists[i].push(c); return; }
+    }
+    lists[mainCount-1].push(c);
+  });
+
+  plan={names, lists, luxFrom:luxCrew>0?N-luxCrew:N};
+  render();
+}
+
+/* ---------- board ---------- */
+function unitsOf(list){ return list.reduce((s,c)=>s+weight(c.type),0); }
+
+function render(){
+  const board=$("board");
+  board.innerHTML="";
+  const avg = plan.lists.reduce((s,l)=>s+unitsOf(l),0)/plan.names.length;
+
+  plan.names.forEach((name,idx)=>{
+    const list=plan.lists[idx].sort((a,b)=>a.n-b.n);
+    const col=document.createElement("div");
+    col.className="crew"; col.dataset.idx=idx;
+
+    const box=document.createElement("div");
+    box.className="cabins";
+    list.forEach(c=>{
+      const d=document.createElement("div");
+      d.className="cab "+c.type;
+      d.textContent=c.n;
+      d.draggable=true;
+      d.dataset.n=c.n;
+      d.title=({window:"Window cabin",inside:"No window",lux:"Lux — counts as two",unknown:"Not in any range"})[c.type];
+      box.appendChild(d);
+    });
+    col.appendChild(box);
+
+    const w=list.filter(c=>c.type==="window").length;
+    const i=list.filter(c=>c.type==="inside"||c.type==="unknown").length;
+    const l=list.filter(c=>c.type==="lux").length;
+    const u=unitsOf(list);
+    const foot=document.createElement("div");
+    foot.className="foot";
+    foot.innerHTML=`<b>${name}</b><small class="${Math.abs(u-avg)>1.5?"off":""}">${w}w ${i}i${l?" "+l+"L":""} · ${u}</small>`;
+    col.appendChild(foot);
+    board.appendChild(col);
+  });
+
+  $("resultPanel").classList.remove("hidden");
+  buildSheet();
+  wireDrag();
+  $("resultPanel").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+let dragged=null;
+function wireDrag(){
+  document.querySelectorAll(".cab").forEach(el=>{
+    el.addEventListener("dragstart",e=>{
+      dragged=+el.dataset.n; el.classList.add("dragging");
+      e.dataTransfer.effectAllowed="move";
+      e.dataTransfer.setData("text/plain",el.dataset.n);
+    });
+    el.addEventListener("dragend",()=>{ el.classList.remove("dragging"); dragged=null; });
+  });
+  document.querySelectorAll(".crew").forEach(col=>{
+    col.addEventListener("dragover",e=>{ e.preventDefault(); col.classList.add("over"); });
+    col.addEventListener("dragleave",()=>col.classList.remove("over"));
+    col.addEventListener("drop",e=>{
+      e.preventDefault(); col.classList.remove("over");
+      const n=dragged || +e.dataTransfer.getData("text/plain");
+      if(!n) return;
+      const to=+col.dataset.idx;
+      let moved=null;
+      plan.lists.forEach(l=>{
+        const k=l.findIndex(c=>c.n===n);
+        if(k>-1) moved=l.splice(k,1)[0];
+      });
+      if(moved){ plan.lists[to].push(moved); render(); }
+    });
+  });
+}
+
+/* ---------- print sheet ---------- */
+function buildSheet(){
+  const rows=Math.max(...plan.lists.map(l=>l.length));
+  let html=`<h3>Cabin cleaning — ${voyage.from||""}${voyage.to?" to "+voyage.to:""}${voyage.date?", "+voyage.date:""}${voyage.time?" "+voyage.time:""}</h3>`;
+  html+=`<p class="sub">${cabins.length} cabins · ${plan.names.length} crew${plan.luxFrom<plan.names.length?" · lux: "+plan.names.slice(plan.luxFrom).join(", "):""}</p>`;
+  html+="<table>";
+  for(let r=0;r<rows;r++){
+    html+="<tr>";
+    plan.lists.forEach(l=>{
+      const c=l[r];
+      html+=`<td class="${c&&c.type==="lux"?"lux":""}">${c?c.n:""}</td>`;
+    });
+    html+="</tr>";
+  }
+  html+="<tr>"+plan.names.map(n=>`<td class="name">${n}</td>`).join("")+"</tr>";
+  html+="</table>";
+  $("sheet").innerHTML=html;
+  return html;
+}
+
+/* ---------- exports ---------- */
+async function copyTable(){
+  const html=$("sheet").innerHTML;
+  const text=(()=>{
+    const rows=Math.max(...plan.lists.map(l=>l.length));
+    const lines=[];
+    for(let r=0;r<rows;r++) lines.push(plan.lists.map(l=>l[r]?l[r].n:"").join("\t"));
+    lines.push(plan.names.join("\t"));
+    return lines.join("\n");
+  })();
+  try{
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([html],{type:"text/html"}),
+      "text/plain": new Blob([text],{type:"text/plain"})
+    })]);
+    flash("Copied — paste it straight into an email.");
+  }catch(err){
+    try{ await navigator.clipboard.writeText(text); flash("Copied as plain columns."); }
+    catch(e2){ flash("Copying was blocked. Use Print instead."); }
+  }
+}
+function flash(msg){
+  $("copied").textContent=msg;
+  setTimeout(()=>{ $("copied").textContent=""; },3500);
+}
+function downloadCsv(){
+  const rows=Math.max(...plan.lists.map(l=>l.length));
+  const lines=[plan.names.join(";")];
+  for(let r=0;r<rows;r++) lines.push(plan.lists.map(l=>l[r]?l[r].n:"").join(";"));
+  const blob=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="cabin-split-"+(voyage.date||"today").replace(/\./g,"-")+".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- wiring ---------- */
+const drop=$("drop"), fileInput=$("file");
+drop.onclick=()=>fileInput.click();
+drop.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); fileInput.click(); } };
+fileInput.onchange=e=>{ if(e.target.files[0]) readPdf(e.target.files[0]); };
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop",e=>{
+  const f=e.dataTransfer.files[0];
+  if(f && /\.pdf$/i.test(f.name)) readPdf(f);
+  else statusEl.textContent="That is not a PDF.";
+});
+
+$("useManual").onclick=()=>{
+  const nums=$("manual").value.match(/\b[5-8]\d{3}\b/g)||[];
+  if(!nums.length){ statusEl.textContent="No cabin numbers recognised in that text."; return; }
+  voyage={};
+  setCabins([...new Set(nums)]);
+  statusEl.textContent=cabins.length+" cabins entered by hand.";
+  drop.classList.add("done");
+};
+
+$("names").addEventListener("input",()=>{ suggestLux(); refreshBuild(); });
+$("names").value = store.get("cs_names") || "";
+$("names").addEventListener("change",()=>store.set("cs_names",$("names").value));
+$("luxCount").addEventListener("input",()=>{ $("luxCount").dataset.touched="1"; });
+$("build").onclick=buildPlan;
+$("print").onclick=()=>window.print();
+$("copy").onclick=copyTable;
+$("csv").onclick=downloadCsv;
+
+$("rWin").value=RANGES.window; $("rIns").value=RANGES.inside; $("rLux").value=RANGES.lux;
+$("saveRanges").onclick=()=>{
+  RANGES={window:$("rWin").value, inside:$("rIns").value, lux:$("rLux").value};
+  store.set("cs_window",RANGES.window); store.set("cs_inside",RANGES.inside); store.set("cs_lux",RANGES.lux);
+  if(cabins.length) setCabins(cabins.map(c=>c.n));
+  $("rangeMsg").textContent="Saved.";
+  setTimeout(()=>$("rangeMsg").textContent="",2500);
+};
+$("resetRanges").onclick=()=>{
+  RANGES={...DEFAULT_RANGES};
+  $("rWin").value=RANGES.window; $("rIns").value=RANGES.inside; $("rLux").value=RANGES.lux;
+  store.set("cs_window",""); store.set("cs_inside",""); store.set("cs_lux","");
+  if(cabins.length) setCabins(cabins.map(c=>c.n));
+  $("rangeMsg").textContent="Back to the original list.";
+  setTimeout(()=>$("rangeMsg").textContent="",2500);
+};
+refreshBuild();
+</script>
+</body>
+</html>
