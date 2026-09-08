@@ -94,15 +94,40 @@ button.small{padding:4px 10px;font-size:13px}
 .addbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .addbar input{max-width:290px}
 
-table.crewtable{width:100%;border-collapse:collapse}
-table.crewtable th{text-align:left;font-size:12.5px;font-weight:500;color:var(--muted);
+/* per-cabin type picker */
+.pop{position:absolute;z-index:50;background:var(--sea-800);border:1px solid var(--action);
+  border-radius:9px;padding:6px;box-shadow:0 10px 30px rgba(0,0,0,.5);min-width:158px}
+.pop .head{font-size:12.5px;color:var(--muted);padding:2px 8px 6px;
+  font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);margin-bottom:5px}
+.pop button{display:block;width:100%;text-align:left;background:none;border:none;
+  padding:6px 9px;border-radius:6px;font-size:14px;color:var(--text)}
+.pop button:hover{background:var(--sea-700)}
+.pop button .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px}
+.pop button.on{background:rgba(47,150,216,.18);font-weight:600}
+.pop button.danger{color:var(--unk);border-top:1px solid var(--line);border-radius:0 0 6px 6px;margin-top:4px}
+
+/* unrecognised cabins, one row each */
+.fixlist{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.fixrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fixrow b{font-variant-numeric:tabular-nums;min-width:52px;font-weight:600}
+.fixrow button{padding:3px 11px;font-size:13px}
+.fixrow button.on{background:var(--action);border-color:var(--action);color:#04121d;font-weight:600}
+
+.rosterbar{display:grid;grid-template-columns:1fr 220px;gap:16px;align-items:start;margin-bottom:4px}
+@media(max-width:700px){.rosterbar{grid-template-columns:1fr}}
+#rosterDrop{border:1.5px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer}
+#rosterDrop:hover,#rosterDrop.over{border-color:var(--action);background:rgba(47,150,216,.08)}
+#rosterDrop.done{border-style:solid;border-color:var(--win);background:rgba(79,209,197,.07)}
+#rosterDrop strong{display:block;font-size:16px}
+#rosterDrop span{color:var(--muted);font-size:13.5px}
+
+table.crewtable{width:100%;border-collapse:collapse}table.crewtable th{text-align:left;font-size:12.5px;font-weight:500;color:var(--muted);
   padding:0 8px 7px 0;white-space:nowrap}
 table.crewtable td{padding:3px 8px 3px 0;vertical-align:middle}
 table.crewtable input[type=text]{min-width:130px}
 table.crewtable input[type=number]{width:92px}
 table.crewtable select{width:132px}
-.mid{text-align:center}
-input[type=checkbox]{width:17px;height:17px;accent-color:var(--action);cursor:pointer}
+.mid{text-align:center}input[type=checkbox]{width:17px;height:17px;accent-color:var(--action);cursor:pointer}
 .del{background:none;border:none;color:var(--muted);font-size:19px;cursor:pointer;padding:0 6px}
 .del:hover{color:var(--unk)}
 
@@ -193,13 +218,30 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
 
   <section class="panel">
     <h2>2 · The crew</h2>
-    <p class="hint tight">Order matters — the list runs from deck 5 upward, so the top name gets the lowest cabins.
-      Use <b>Workload</b> for a short day, or type an <b>exact number of cabins</b> for someone signing off or just joining. Everyone else absorbs the difference.</p>
+    <p class="hint tight">Load the monthly working list and pick a day, or type the names in yourself.
+      Order matters — the list runs from deck 5 upward, so the top name gets the lowest cabins.</p>
+
+    <div class="rosterbar">
+      <div id="rosterDrop" tabindex="0" role="button">
+        <strong>Drop the working list PDF here</strong>
+        <span>the monthly Housekeeping plan</span>
+      </div>
+      <input type="file" id="rosterFile" accept="application/pdf" class="hidden">
+      <div id="rosterPick" class="hidden">
+        <label for="daySelect">Day</label>
+        <select id="daySelect"></select>
+        <div class="row mt"><button id="applyRoster" class="primary">Load this day</button></div>
+        <p class="hint mt" id="dayPreview" style="margin-bottom:0"></p>
+      </div>
+    </div>
+    <div id="rosterStatus" style="font-size:14px;color:var(--muted);margin:10px 0 4px;min-height:20px"></div>
+    <div id="rosterSkipped" class="hidden" style="font-size:13.5px;color:var(--muted);margin-bottom:12px"></div>
+
     <table class="crewtable">
       <thead><tr>
         <th style="width:100%">Name</th>
         <th>Lux only</th>
-        <th>Workload</th>
+        <th>Status</th>
         <th>Exact cabins</th>
         <th></th>
       </tr></thead>
@@ -256,9 +298,19 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
       <div><label for="rIns">Cabins without windows</label><textarea id="rIns"></textarea></div>
       <div><label for="rLux">Lux cabins</label><textarea id="rLux"></textarea></div>
     </div>
-    <div class="mt" style="max-width:300px">
-      <label for="luxWeight">A lux cabin counts as this many cabins</label>
-      <input type="number" id="luxWeight" min="1" max="5" step="0.5" value="2">
+    <div class="grid3 mt">
+      <div>
+        <label for="luxWeight">A lux cabin counts as this many cabins</label>
+        <input type="number" id="luxWeight" min="1" max="5" step="0.5" value="2">
+      </div>
+      <div>
+        <label for="offCabins">Cabins on a sign-off day</label>
+        <input type="number" id="offCabins" min="0" value="10">
+      </div>
+      <div>
+        <label for="onCabins">Cabins on a sign-on day</label>
+        <input type="number" id="onCabins" min="0" value="10">
+      </div>
     </div>
     <div class="row mt">
       <button class="primary" id="saveRules">Save the rules</button>
@@ -285,13 +337,15 @@ const DEFAULTS = {
   window:"5001-5016, 5101-5116, 6001-6016, 6101-6116, 6201-6216, 6301-6316, 7001-7004, 7101-7104, 7201-7216, 7301-7312, 7501-7509, 7512, 8001-8016, 8101-8116",
   inside:"5017-5032, 5117-5133, 6017-6036, 6117-6136, 6217-6224, 6317-6322, 7026-7027, 7127, 7217-7239, 7313-7320, 8017-8032, 8117-8132",
   lux:"8201-8211, 8301-8311, 8401-8407, 8501-8507",
-  luxWeight:2
+  luxWeight:2, offCabins:10, onCabins:10
 };
 let RULES = {
   window: store.get("cs_window") || DEFAULTS.window,
   inside: store.get("cs_inside") || DEFAULTS.inside,
   lux:    store.get("cs_lux")    || DEFAULTS.lux,
-  luxWeight: parseFloat(store.get("cs_luxw")) || DEFAULTS.luxWeight
+  luxWeight: parseFloat(store.get("cs_luxw")) || DEFAULTS.luxWeight,
+  offCabins: store.get("cs_off")===null||store.get("cs_off")===""?DEFAULTS.offCabins:parseInt(store.get("cs_off"),10),
+  onCabins:  store.get("cs_on") ===null||store.get("cs_on") ===""?DEFAULTS.onCabins :parseInt(store.get("cs_on"),10)
 };
 function parseRanges(str){
   const out=[];
@@ -401,11 +455,62 @@ function renderTally(){
   if(c.unknown){
     const list=cabins.filter(x=>x.type==="unknown").map(x=>x.n);
     w.className="warn";
-    w.innerHTML=`<b>Not in any range:</b> ${list.join(", ")}. Click the number below to set its type, or add it to a range under <i>The rules</i>.`;
+    w.innerHTML=`<b>${list.length} cabin${list.length>1?"s are":" is"} not in any of your ranges.</b>
+      Set each one below. Until then ${list.length>1?"they are split":"it is split"} like an inside cabin.
+      <div class="fixlist"></div>`;
+    const box=w.querySelector(".fixlist");
+    list.forEach(n=>{
+      const row=document.createElement("div");
+      row.className="fixrow";
+      row.innerHTML=`<b>${n}</b>`;
+      TYPES.forEach(([key,label])=>{
+        const b=document.createElement("button");
+        b.textContent=label;
+        b.onclick=()=>{ override[n]=key; setCabins(cabins.map(x=>x.n)); };
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+    });
   } else w.classList.add("hidden");
 }
 
-const CYCLE=["window","inside","lux","unknown"];
+const TYPES=[["window","Window"],["inside","Inside"],["lux","Lux"]];
+const COLOURS={window:"var(--win)",inside:"var(--ins)",lux:"var(--lux)",unknown:"var(--unk)"};
+
+function closePop(){ const p=document.querySelector(".pop"); if(p) p.remove(); }
+document.addEventListener("click",e=>{ if(!e.target.closest(".pop")&&!e.target.closest(".chip")) closePop(); });
+window.addEventListener("scroll",closePop,true);
+
+function openPop(cabin, anchor){
+  closePop();
+  const p=document.createElement("div");
+  p.className="pop";
+  p.innerHTML=`<div class="head">Cabin ${cabin.n}</div>`;
+  TYPES.forEach(([key,label])=>{
+    const b=document.createElement("button");
+    if(cabin.type===key) b.className="on";
+    b.innerHTML=`<span class="dot" style="background:${COLOURS[key]}"></span>${label}`;
+    b.onclick=()=>{ override[cabin.n]=key; closePop(); setCabins(cabins.map(x=>x.n)); };
+    p.appendChild(b);
+  });
+  const auto=document.createElement("button");
+  auto.innerHTML=`<span class="dot" style="background:transparent;border:1px solid var(--muted)"></span>Use the ranges`;
+  auto.onclick=()=>{ delete override[cabin.n]; closePop(); setCabins(cabins.map(x=>x.n)); };
+  p.appendChild(auto);
+  const rm=document.createElement("button");
+  rm.className="danger";
+  rm.textContent="Remove this cabin";
+  rm.onclick=()=>{ closePop(); setCabins(cabins.filter(x=>x.n!==cabin.n).map(x=>x.n)); };
+  p.appendChild(rm);
+
+  document.body.appendChild(p);
+  const r=anchor.getBoundingClientRect();
+  const top=r.bottom+window.scrollY+5;
+  const left=Math.min(r.left+window.scrollX, window.innerWidth-p.offsetWidth-14);
+  p.style.top=top+"px";
+  p.style.left=Math.max(8,left)+"px";
+}
+
 function renderCabins(){
   const box=$("cabinBox");
   $("cabinDetails").classList.toggle("hidden",!cabins.length);
@@ -413,25 +518,33 @@ function renderCabins(){
   cabins.forEach(c=>{
     const el=document.createElement("span");
     el.className="chip "+c.type;
-    el.innerHTML=`<b title="Now: ${c.type}. Click to change.">${c.n}</b><span class="x" title="Remove">×</span>`;
-    el.querySelector("b").onclick=()=>{
-      override[c.n]=CYCLE[(CYCLE.indexOf(c.type)+1)%CYCLE.length];
-      setCabins(cabins.map(x=>x.n));
-    };
-    el.querySelector(".x").onclick=()=>setCabins(cabins.filter(x=>x.n!==c.n).map(x=>x.n));
+    el.innerHTML=`<b title="${{window:"Window",inside:"No window",lux:"Lux",unknown:"Not in any range"}[c.type]} — click to change">${c.n}</b><span class="x" title="Remove">×</span>`;
+    el.querySelector("b").onclick=e=>{ e.stopPropagation(); openPop(c, el); };
+    el.querySelector(".x").onclick=e=>{ e.stopPropagation(); setCabins(cabins.filter(x=>x.n!==c.n).map(x=>x.n)); };
     box.appendChild(el);
   });
 }
 
 /* ================= crew ================= */
-const SHARES=[["1","Full day"],["0.75","Three quarters"],["0.5","Half day"],["0.25","Quarter day"]];
+const ROLES=[["full","Full day"],["off","Sign-off"],["on","Sign-on"]];
 let crew=[];
+
+function fixedCabins(p){
+  if(p.exact!=="" && p.exact!==undefined && p.exact!==null) return p.exact;
+  if(p.role==="off") return RULES.offCabins;
+  if(p.role==="on")  return RULES.onCabins;
+  return null;
+}
 function loadCrew(){
   try{
     const s=JSON.parse(store.get("cs_crew")||"null");
-    if(Array.isArray(s)&&s.length) crew=s;
+    if(Array.isArray(s)&&s.length) crew=s.map(c=>({
+      name:c.name||"", lux:!!c.lux,
+      role:c.role||"full",              // older saves used a share number
+      exact:c.exact===undefined?"":c.exact
+    }));
   }catch(e){}
-  if(!crew.length) crew=[{name:"",lux:false,share:1,exact:""}];
+  if(!crew.length) crew=[{name:"",lux:false,role:"full",exact:""}];
 }
 const saveCrew = () => store.set("cs_crew",JSON.stringify(crew));
 
@@ -440,20 +553,21 @@ function renderCrew(){
   b.innerHTML="";
   crew.forEach((c,i)=>{
     const tr=document.createElement("tr");
+    const def=c.role==="off"?RULES.offCabins:c.role==="on"?RULES.onCabins:null;
     tr.innerHTML=`
       <td><input type="text" value="${esc(c.name)}" placeholder="Name"></td>
       <td class="mid"><input type="checkbox" ${c.lux?"checked":""} title="Cleans lux cabins only"></td>
-      <td><select>${SHARES.map(([v,l])=>`<option value="${v}"${String(c.share)===v?" selected":""}>${l}</option>`).join("")}</select></td>
-      <td><input type="number" min="0" value="${c.exact===""?"":c.exact}" placeholder="auto" title="Leave empty to share evenly"></td>
+      <td><select>${ROLES.map(([v,l])=>`<option value="${v}"${c.role===v?" selected":""}>${l}</option>`).join("")}</select></td>
+      <td><input type="number" min="0" value="${c.exact===""?"":c.exact}" placeholder="${def!==null?def:"auto"}" title="${def!==null?"Leave empty to use the default for this status":"Leave empty to share evenly"}"></td>
       <td><button class="del" title="Remove">×</button></td>`;
     const f=tr.querySelectorAll("input,select");
     f[0].oninput=e=>{ c.name=e.target.value; saveCrew(); refreshBuild(); };
     f[1].onchange=e=>{ c.lux=e.target.checked; saveCrew(); refreshBuild(); };
-    f[2].onchange=e=>{ c.share=parseFloat(e.target.value); saveCrew(); refreshBuild(); };
+    f[2].onchange=e=>{ c.role=e.target.value; saveCrew(); renderCrew(); refreshBuild(); };
     f[3].oninput=e=>{ c.exact=e.target.value===""?"":Math.max(0,parseInt(e.target.value,10)||0); saveCrew(); refreshBuild(); };
     tr.querySelector(".del").onclick=()=>{
       crew.splice(i,1);
-      if(!crew.length) crew.push({name:"",lux:false,share:1,exact:""});
+      if(!crew.length) crew.push({name:"",lux:false,role:"full",exact:""});
       saveCrew(); renderCrew(); refreshBuild();
     };
     b.appendChild(tr);
@@ -466,13 +580,125 @@ function refreshBuild(){
   $("build").disabled=!(cabins.length&&n.length);
   if(cabins.length&&n.length){
     const c=counts();
-    const fixed=n.filter(x=>x.exact!=="").reduce((s,x)=>s+x.exact,0);
-    const flex=n.filter(x=>x.exact==="").reduce((s,x)=>s+x.share,0);
+    let fixed=0, flex=0;
+    n.forEach(p=>{ const f=fixedCabins(p); if(f===null) flex++; else fixed+=f; });
     const left=Math.max(0,c.units-fixed);
     $("perCrew").textContent = flex
-      ? "About "+(left/flex).toFixed(1)+" cabins for a full day · "+n.length+" crew"
-      : n.length+" crew, every one with an exact number set";
+      ? "About "+Math.round(left/flex)+" cabins each for a full day · "+n.length+" crew"
+      : n.length+" crew, every one with a fixed number";
   } else $("perCrew").textContent="";
+}
+
+/* ================= the working list (roster) ================= */
+let roster=null;   // {month, days:[…], people:[{rank,name,marks}]}
+
+function rosterLines(items){
+  const lines=[];
+  items.forEach(it=>{
+    const s=it.str; if(!s||!s.trim()) return;
+    const y=it.transform[5], x=it.transform[4], w=it.width||0;
+    let L=lines.find(l=>Math.abs(l.y-y)<=2.5);
+    if(!L){ L={y,items:[]}; lines.push(L); }
+    // a run of marks printed as one string: spread the characters over its width
+    if(s.trim().length>3 && w>0 && /^[1\-+VTCvtc\s]+$/.test(s)){
+      const cw=w/s.length;
+      for(let i=0;i<s.length;i++) if(s[i].trim()) L.items.push({s:s[i],x:x+(i+0.5)*cw});
+    } else L.items.push({s:s.trim(),x});
+  });
+  lines.forEach(l=>l.items.sort((a,b)=>a.x-b.x));
+  return lines.sort((a,b)=>b.y-a.y);
+}
+
+async function readRoster(file){
+  const st=$("rosterStatus");
+  st.textContent="Reading "+file.name+" …";
+  if(!window.pdfjsLib){ st.textContent="The PDF reader did not load."; return; }
+  let doc;
+  try{ doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise; }
+  catch(e){ st.textContent="That file could not be opened as a PDF."; return; }
+
+  let dayX=null, xName=null, xPrimo=null, month="";
+  const people=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const lines=rosterLines((await (await doc.getPage(p)).getTextContent()).items);
+    for(const L of lines){
+      const txt=L.items.map(i=>i.s).join(" ");
+      if(/CrewName/.test(txt)){
+        const my=txt.match(/([A-Za-z]+)\s+(\d{4})/); if(my) month=my[1]+" "+my[2];
+        const cn=L.items.find(i=>i.s==="CrewName"); if(!cn) continue;
+        xName=cn.x;
+        const pr=L.items.find(i=>i.s==="Primo"); xPrimo=pr?pr.x:xName+96;
+        dayX={};
+        L.items.forEach(i=>{
+          if(/^\d{1,2}$/.test(i.s)&&i.x>xPrimo){ const d=+i.s; if(d>=1&&d<=31&&!(d in dayX)) dayX[d]=i.x; }
+        });
+        continue;
+      }
+      if(!dayX) continue;
+      const rank=L.items.filter(i=>i.x<xName-8).map(i=>i.s)
+        .filter(s=>!/^\d+$/.test(s)&&!/^[«»]$/.test(s)).join(" ").replace(/^[«»\s]+/,"").trim();
+      const name=L.items.filter(i=>i.x>=xName-4&&i.x<xPrimo-8).map(i=>i.s).join(" ").trim();
+      if(!name||/^[\d\s]+$/.test(name)) continue;
+      const marks={};
+      Object.entries(dayX).forEach(([d,dx])=>{
+        let best=null,bd=7;
+        L.items.forEach(i=>{ if(i.x<xPrimo+4) return;
+          const dd=Math.abs(i.x-dx); if(dd<bd){ bd=dd; best=i; } });
+        if(best) marks[d]=best.s;
+      });
+      people.push({rank,name,marks});
+    }
+  }
+  if(!dayX||!people.length){ st.textContent="No working list found in that PDF."; return; }
+
+  roster={month,days:Object.keys(dayX).map(Number).sort((a,b)=>a-b),people};
+  const sel=$("daySelect");
+  sel.innerHTML=roster.days.map(d=>`<option value="${d}">${d}</option>`).join("");
+  // if the cleaning list is for a day in the same month, start there
+  const m=(voyage.date||"").match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if(m){
+    const names=["january","february","march","april","may","june","july","august","september","october","november","december"];
+    const mi=names.indexOf((month.split(" ")[0]||"").toLowerCase());
+    if(mi>=0 && +m[2]===mi+1 && roster.days.includes(+m[1])) sel.value=String(+m[1]);
+  }
+  $("rosterPick").classList.remove("hidden");
+  $("rosterDrop").classList.add("done");
+  st.textContent=people.length+" people read"+(month?" · "+month:"");
+  previewDay();
+}
+
+const MARK={"1":"full","-":"off","+":"on"};
+function dayCrew(day){
+  if(!roster) return {take:[],skip:[]};
+  const take=[],skip=[];
+  roster.people.forEach(p=>{
+    const role=MARK[p.marks[day]];
+    if(!role) return;
+    if(/manager/i.test(p.rank)) skip.push(p.name);
+    else take.push({name:p.name,lux:false,role,exact:""});
+  });
+  return {take,skip};
+}
+function previewDay(){
+  const d=+$("daySelect").value;
+  const {take,skip}=dayCrew(d);
+  const off=take.filter(p=>p.role==="off").length, on=take.filter(p=>p.role==="on").length;
+  $("dayPreview").textContent=take.length+" onboard"+(off?" · "+off+" signing off":"")+(on?" · "+on+" signing on":"");
+  const sk=$("rosterSkipped");
+  if(skip.length){ sk.classList.remove("hidden"); sk.innerHTML="Managers left out: "+skip.map(esc).join(", ")+"."; }
+  else sk.classList.add("hidden");
+}
+function applyRoster(){
+  const d=+$("daySelect").value;
+  const {take}=dayCrew(d);
+  if(!take.length){ $("rosterStatus").textContent="Nobody is marked as onboard on day "+d+"."; return; }
+  const prev=crew.slice();
+  crew=take.map(p=>{
+    const old=prev.find(c=>c.name===p.name);
+    return {name:p.name, lux:old?old.lux:false, role:p.role, exact:old?old.exact:""};
+  });
+  saveCrew(); renderCrew(); refreshBuild();
+  $("rosterStatus").textContent=crew.length+" crew loaded for day "+d+(roster.month?" of "+roster.month:"")+".";
 }
 
 /* ================= the split ================= */
@@ -501,7 +727,7 @@ function buildPlan(){
   let pool=cabins, poolIdx=people.map((_,i)=>i);
 
   if(luxIdx.length){
-    const w=luxIdx.map(i=>people[i].exact!==""?Math.max(people[i].exact,0.001):people[i].share);
+    const w=luxIdx.map(i=>{ const f=fixedCabins(people[i]); return f===null?1:Math.max(f,0.001); });
     const q=apportion(luxCabins.length,w);
     let k=0;
     luxIdx.forEach((idx,j)=>{
@@ -514,12 +740,12 @@ function buildPlan(){
   if(!poolIdx.length){ plan={people,lists,targets}; render(); return; }
 
   const poolUnits=pool.reduce((s,c)=>s+weightOf(c.type),0);
-  const fixed=poolIdx.map(i=>people[i].exact!==""?people[i].exact:null);
+  const fixed=poolIdx.map(i=>fixedCabins(people[i]));
   const fixedSum=fixed.reduce((s,v)=>s+(v||0),0);
-  const flexSum=poolIdx.reduce((s,i,j)=>s+(fixed[j]===null?people[i].share:0),0);
+  const flexCount=fixed.filter(v=>v===null).length;
   const leftover=Math.max(0,poolUnits-fixedSum);
   const weights=poolIdx.map((i,j)=>
-    fixed[j]!==null ? fixed[j] : (flexSum ? leftover*people[i].share/flexSum : 0));
+    fixed[j]!==null ? fixed[j] : (flexCount ? leftover/flexCount : 0));
   poolIdx.forEach((i,j)=>targets[i]=Math.round(weights[j]));
 
   const groupOf=c=>c.type==="window"?"window":c.type==="lux"?"lux":"inside";
@@ -679,7 +905,7 @@ $("useManual").onclick=()=>{
   drop.classList.add("done");
 };
 
-$("addCrew").onclick=()=>{ crew.push({name:"",lux:false,share:1,exact:""}); saveCrew(); renderCrew(); };
+$("addCrew").onclick=()=>{ crew.push({name:"",lux:false,role:"full",exact:""}); saveCrew(); renderCrew(); };
 $("pasteCrew").onclick=()=>$("pasteBox").classList.toggle("hidden");
 $("cancelPaste").onclick=()=>$("pasteBox").classList.add("hidden");
 $("applyPaste").onclick=()=>{
@@ -688,12 +914,26 @@ $("applyPaste").onclick=()=>{
     const prev=crew.slice();
     crew=names.map(n=>{
       const old=prev.find(c=>c.name===n);
-      return old?{...old}:{name:n,lux:false,share:1,exact:""};
+      return old?{...old}:{name:n,lux:false,role:"full",exact:""};
     });
     saveCrew(); renderCrew(); refreshBuild();
   }
   $("pasteBox").classList.add("hidden");
 };
+
+const rDrop=$("rosterDrop"), rFile=$("rosterFile");
+rDrop.onclick=()=>rFile.click();
+rDrop.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); rFile.click(); } };
+rFile.onchange=e=>{ if(e.target.files[0]) readRoster(e.target.files[0]); };
+["dragenter","dragover"].forEach(ev=>rDrop.addEventListener(ev,e=>{ e.preventDefault(); rDrop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev=>rDrop.addEventListener(ev,e=>{ e.preventDefault(); rDrop.classList.remove("over"); }));
+rDrop.addEventListener("drop",e=>{
+  const f=e.dataTransfer.files[0];
+  if(f&&/\.pdf$/i.test(f.name)) readRoster(f); else $("rosterStatus").textContent="That is not a PDF.";
+});
+$("daySelect").onchange=previewDay;
+$("applyRoster").onclick=applyRoster;
+
 $("build").onclick=buildPlan;
 $("print").onclick=()=>window.print();
 $("copy").onclick=copyTable;
@@ -702,20 +942,27 @@ $("psize").onchange=e=>document.documentElement.style.setProperty("--psize",e.ta
 
 $("rWin").value=RULES.window; $("rIns").value=RULES.inside; $("rLux").value=RULES.lux;
 $("luxWeight").value=RULES.luxWeight;
+$("offCabins").value=RULES.offCabins; $("onCabins").value=RULES.onCabins;
 $("saveRules").onclick=()=>{
   RULES={window:$("rWin").value,inside:$("rIns").value,lux:$("rLux").value,
-         luxWeight:parseFloat($("luxWeight").value)||2};
+         luxWeight:parseFloat($("luxWeight").value)||2,
+         offCabins:Math.max(0,parseInt($("offCabins").value,10)||0),
+         onCabins:Math.max(0,parseInt($("onCabins").value,10)||0)};
   store.set("cs_window",RULES.window); store.set("cs_inside",RULES.inside);
   store.set("cs_lux",RULES.lux); store.set("cs_luxw",String(RULES.luxWeight));
+  store.set("cs_off",String(RULES.offCabins)); store.set("cs_on",String(RULES.onCabins));
   if(cabins.length) setCabins(cabins.map(c=>c.n));
+  renderCrew(); refreshBuild();
   $("rulesMsg").textContent="Saved."; setTimeout(()=>$("rulesMsg").textContent="",2500);
 };
 $("resetRules").onclick=()=>{
   RULES={...DEFAULTS};
   $("rWin").value=RULES.window; $("rIns").value=RULES.inside; $("rLux").value=RULES.lux;
   $("luxWeight").value=RULES.luxWeight;
-  ["cs_window","cs_inside","cs_lux","cs_luxw"].forEach(k=>store.set(k,""));
+  $("offCabins").value=RULES.offCabins; $("onCabins").value=RULES.onCabins;
+  ["cs_window","cs_inside","cs_lux","cs_luxw","cs_off","cs_on"].forEach(k=>store.set(k,""));
   if(cabins.length) setCabins(cabins.map(c=>c.n));
+  renderCrew(); refreshBuild();
   $("rulesMsg").textContent="Back to the original."; setTimeout(()=>$("rulesMsg").textContent="",2500);
 };
 
