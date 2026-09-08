@@ -121,6 +121,12 @@ button.small{padding:4px 10px;font-size:13px}
 #rosterDrop strong{display:block;font-size:16px}
 #rosterDrop span{color:var(--muted);font-size:13.5px}
 
+.luxbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 14px;
+  border:1px solid rgba(227,180,95,.45);background:rgba(227,180,95,.07);
+  border-radius:9px;padding:9px 13px;font-size:14px}
+.luxbar input{width:66px;text-align:center;font-variant-numeric:tabular-nums}
+.luxbar small{color:var(--muted);font-size:13px}
+
 table.crewtable{width:100%;border-collapse:collapse}table.crewtable th{text-align:left;font-size:12.5px;font-weight:500;color:var(--muted);
   padding:0 8px 7px 0;white-space:nowrap}
 table.crewtable td{padding:3px 8px 3px 0;vertical-align:middle}
@@ -236,6 +242,14 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
     </div>
     <div id="rosterStatus" style="font-size:14px;color:var(--muted);margin:10px 0 4px;min-height:20px"></div>
     <div id="rosterSkipped" class="hidden" style="font-size:13.5px;color:var(--muted);margin-bottom:12px"></div>
+
+    <div class="luxbar" id="luxBar">
+      <span>Lux cabins go to</span>
+      <input type="number" id="luxCrewCount" min="0" value="0">
+      <span>crew</span>
+      <button id="luxApply" class="small">Set</button>
+      <small id="luxNote"></small>
+    </div>
 
     <table class="crewtable">
       <thead><tr>
@@ -575,8 +589,33 @@ function renderCrew(){
 }
 const namedCrew = () => crew.filter(c=>(c.name||"").trim());
 
+/* how many crew should be on the lux cabins */
+function autoLuxCount(){
+  const c=counts(), n=namedCrew().length;
+  if(!c.lux||!n) return 0;
+  const per=c.units/n;
+  return Math.max(1, Math.min(n-1, Math.round(c.lux*RULES.luxWeight/per)));
+}
+function applyLuxCount(k){
+  const named=namedCrew();
+  const cut=named.length-Math.max(0,Math.min(k,named.length));
+  named.forEach((p,i)=>{ p.lux = i>=cut; });
+  saveCrew(); renderCrew(); renderLuxBar(); refreshBuild();
+}
+function renderLuxBar(){
+  const bar=$("luxBar"), c=counts(), named=namedCrew();
+  if(!c.lux||!named.length){ bar.style.display="none"; return; }
+  bar.style.display="flex";
+  const picked=named.filter(p=>p.lux);
+  $("luxCrewCount").value=picked.length;
+  $("luxNote").textContent = picked.length
+    ? c.lux+" lux cabins, split between them"
+    : c.lux+" lux cabins — nobody chosen yet, so the last "+autoLuxCount()+" in the list will take them";
+}
+
 function refreshBuild(){
   const n=namedCrew();
+  renderLuxBar();
   $("build").disabled=!(cabins.length&&n.length);
   if(cabins.length&&n.length){
     const c=counts();
@@ -698,6 +737,7 @@ function applyRoster(){
     return {name:p.name, lux:old?old.lux:false, role:p.role, exact:old?old.exact:""};
   });
   saveCrew(); renderCrew(); refreshBuild();
+  if(counts().lux && !crew.some(c=>c.lux)) applyLuxCount(autoLuxCount());
   $("rosterStatus").textContent=crew.length+" crew loaded for day "+d+(roster.month?" of "+roster.month:"")+".";
 }
 
@@ -723,6 +763,12 @@ function buildPlan(){
   const luxCabins=cabins.filter(c=>c.type==="lux");
   let luxIdx=people.map((p,i)=>p.lux?i:-1).filter(i=>i>=0);
   if(!luxCabins.length) luxIdx=[];
+  // lux cabins are never spread thinly across everyone — if nobody was chosen,
+  // take the last few people in the list instead
+  if(luxCabins.length && !luxIdx.length){
+    const k=Math.max(1,Math.min(N-1,autoLuxCount()));
+    for(let i=N-k;i<N;i++) luxIdx.push(i);
+  }
 
   let pool=cabins, poolIdx=people.map((_,i)=>i);
 
@@ -933,6 +979,8 @@ rDrop.addEventListener("drop",e=>{
 });
 $("daySelect").onchange=previewDay;
 $("applyRoster").onclick=applyRoster;
+$("luxApply").onclick=()=>applyLuxCount(Math.max(0,parseInt($("luxCrewCount").value,10)||0));
+$("luxCrewCount").addEventListener("keydown",e=>{ if(e.key==="Enter") $("luxApply").click(); });
 
 $("build").onclick=buildPlan;
 $("print").onclick=()=>window.print();
