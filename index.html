@@ -169,6 +169,11 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--action);cursor:po
 .col .foot{margin-top:auto;border-top:1px solid var(--line);padding:6px 4px 7px;text-align:center;
   background:rgba(24,49,73,.75)}
 .col .foot b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.col .foot .rename{width:100%;background:none;border:1px solid transparent;border-radius:5px;
+  color:var(--text);font-family:inherit;font-size:14px;font-weight:600;text-align:center;
+  padding:1px 2px;margin-bottom:1px}
+.col .foot .rename:hover{border-color:var(--line)}
+.col .foot .rename:focus{border-color:var(--action);background:var(--sea-900);outline:none}
 .col .foot small{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;display:block}
 .col .foot small.off{color:var(--unk)}
 .legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin-top:14px}
@@ -447,6 +452,14 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
       <label for="syncToken">Auth token, if your rules need one</label>
       <input type="password" id="syncToken" placeholder="leave empty for open rules">
     </div>
+    <div class="row mt" style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:4px">
+      <button id="fileSave">Save settings to a file</button>
+      <button id="fileLoad">Load settings from a file</button>
+      <input type="file" id="fileIn" accept="application/json,.json" class="hidden">
+      <span id="fileMsg" style="font-size:14px;color:var(--muted)"></span>
+    </div>
+    <p class="hint" style="margin:0 0 16px">Everything is already kept in this browser, so a refresh will not lose it. The file is for moving to another computer, or keeping a copy before you change the rules around.</p>
+
     <div class="row mt">
       <button class="primary" id="syncSave">Connect and send what I have</button>
       <button id="syncPull">Fetch from the database</button>
@@ -1138,7 +1151,8 @@ function fillArea(area, g, people, lists, targets){
 }
 
 function buildPlan(){
-  const people=namedCrew().map(c=>({...c}));
+  const refs=namedCrew();
+  const people=refs.map(c=>({...c}));
   const N=people.length;
   const lists=people.map(()=>[]);
   const targets=new Array(N).fill(0);
@@ -1164,7 +1178,7 @@ function buildPlan(){
     pool=live.filter(c=>c.type!=="lux");
     poolIdx=people.map((_,i)=>i).filter(i=>!luxIdx.includes(i));
   }
-  if(!poolIdx.length){ plan={people,lists,targets,skipped:cabins.length-live.length}; render(); return; }
+  if(!poolIdx.length){ plan={people,refs,lists,targets,skipped:cabins.length-live.length}; render(); return; }
 
   /* ---- build the areas ---- */
   const areas=[];
@@ -1279,7 +1293,7 @@ function buildPlan(){
 
   const areaOf={};
   live_areas.forEach(a=>a.crewIdx.forEach(i=>areaOf[i]=a.name));
-  plan={people,lists,targets,areaOf,skipped:cabins.length-live.length};
+  plan={people,refs,lists,targets,areaOf,skipped:cabins.length-live.length};
   render();
 }
 
@@ -1308,10 +1322,20 @@ function render(){
     const decks=[...new Set(list.map(c=>deckOf(c.n)))].sort();
     const foot=document.createElement("div");
     foot.className="foot";
-    foot.innerHTML=`<b>${esc(p.name)}</b>
+    foot.innerHTML=`<input class="rename" value="${esc(p.name)}" title="Change this name">
       <small class="${decks.length>1?"off":""}">${esc((plan.areaOf&&plan.areaOf[idx])||(decks.length?"Deck "+decks.join(" + "):"—"))}</small>
       <small class="${Math.abs(list.length-t)>1?"off":""}">${list.length} of ${t}</small>
       <small>${w}w ${i}i${l?" "+l+"L":""}</small>`;
+    const nameBox=foot.querySelector(".rename");
+    nameBox.oninput=e=>{
+      const was=plan.people[idx].name, now=e.target.value;
+      plan.people[idx].name=now;
+      if(plan.refs&&plan.refs[idx]) plan.refs[idx].name=now;
+      LIST.forEach(r=>{ if(r.type==="pin"&&r.who===was) r.who=now; });
+      saveCrew(); saveList();
+      buildPrint();
+    };
+    nameBox.onblur=()=>{ renderCrew(); renderRules(); };
     col.appendChild(foot);
     board.appendChild(col);
   });
@@ -1582,6 +1606,53 @@ $("saveRules").onclick=()=>{
 $("resetRules").onclick=()=>{
   RULES={...DEF_RULES}; saveRules(); fillRules(); renderCrew(); refreshBuild();
   flash("rulesMsg","Caps and weighting are back to the original. Your rule list is untouched.");
+};
+
+/* ---- settings as a file on your own computer ---- */
+function settingsBlob(){
+  return {
+    app:"Norrona cabin split", version:1, saved:new Date().toISOString(),
+    ship:shipOverrides(), rules:RULES, ruleList:LIST, presets:PRESETS, crew,
+    sync:{url:SYNC.url, path:SYNC.path}      // the token is deliberately left out
+  };
+}
+function applySettings(d){
+  if(!d||typeof d!=="object") throw new Error("not a settings file");
+  if(d.ship&&typeof d.ship==="object"){ SHIP={...SHIP_DEFAULT,...d.ship}; store.set("cs_ship",JSON.stringify(d.ship)); }
+  if(d.rules){ Object.assign(RULES,DEF_RULES,d.rules); store.set("cs_rules",JSON.stringify(RULES)); }
+  if(Array.isArray(d.ruleList)){ LIST=d.ruleList; store.set("cs_rulelist",JSON.stringify(LIST)); }
+  if(d.presets&&typeof d.presets==="object"){ PRESETS=d.presets; store.set("cs_presets",JSON.stringify(PRESETS)); }
+  if(Array.isArray(d.crew)&&d.crew.length){
+    crew=d.crew.map(c=>({name:c.name||"",lux:!!c.lux,role:c.role||"full",
+      exact:c.exact===undefined||c.exact===null?"":c.exact}));
+    store.set("cs_crew",JSON.stringify(crew));
+  }
+  if(d.sync&&d.sync.url){
+    SYNC.url=d.sync.url; SYNC.path=d.sync.path||"cabinSplit";
+    store.set("cs_url",SYNC.url); store.set("cs_path",SYNC.path);
+    $("syncUrl").value=SYNC.url; $("syncPath").value=SYNC.path;
+  }
+  renderDb(); fillRules(); renderRules(); renderPresets(); renderCrew();
+  if(cabins.length) setCabins(cabins.map(c=>c.n));
+  refreshBuild(); syncPill();
+}
+$("fileSave").onclick=()=>{
+  const blob=new Blob([JSON.stringify(settingsBlob(),null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="cabin-split-settings-"+new Date().toISOString().slice(0,10)+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  flash("fileMsg","Saved. Keep it somewhere safe.");
+};
+$("fileLoad").onclick=()=>$("fileIn").click();
+$("fileIn").onchange=async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    applySettings(JSON.parse(await f.text()));
+    flash("fileMsg","Settings loaded from "+f.name+".");
+    push();
+  }catch(err){ flash("fileMsg","Could not read that file: "+err.message); }
+  e.target.value="";
 };
 
 $("syncUrl").value=SYNC.url; $("syncPath").value=SYNC.path; $("syncToken").value=SYNC.token;
