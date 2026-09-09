@@ -121,6 +121,27 @@ button.small{padding:4px 10px;font-size:13px}
 .luxbar input{width:66px;text-align:center;font-variant-numeric:tabular-nums}
 .luxbar small{color:var(--muted);font-size:13px}
 
+.presetbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:rgba(13,27,42,.4)}
+.rule{display:grid;grid-template-columns:26px 92px 1fr auto;gap:9px;align-items:center;
+  border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:7px;
+  background:rgba(13,27,42,.45)}
+.rule.off{opacity:.45}
+.rule .kind{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;
+  letter-spacing:.02em;text-transform:uppercase}
+.rule.zone .kind{color:var(--action)} .rule.helper .kind{color:var(--win)}
+.rule.priority .kind{color:var(--lux)} .rule.skip .kind{color:var(--unk)}
+.rule.pin .kind{color:#c99cf0} .rule.pair .kind{color:var(--ins)}
+.rule .fields{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.rule .fields input,.rule .fields select{width:auto;min-width:110px;padding:6px 9px;font-size:14px}
+.rule .fields input.wide{min-width:210px;flex:1}
+.rule .fields label{margin:0;font-size:12.5px;white-space:nowrap}
+.rule .tools{display:flex;gap:2px;align-items:center}
+.rule .tools button{background:none;border:none;color:var(--muted);padding:2px 5px;font-size:15px}
+.rule .tools button:hover{color:var(--text)}
+.rule .hits{font-size:12.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+@media(max-width:760px){.rule{grid-template-columns:1fr;gap:7px}}
+
 table.crewtable{width:100%;border-collapse:collapse}
 table.crewtable th{text-align:left;font-size:12.5px;font-weight:500;color:var(--muted);
   padding:0 8px 7px 0;white-space:nowrap}
@@ -144,6 +165,7 @@ input[type=checkbox]{width:17px;height:17px;accent-color:var(--action);cursor:po
 .cab.window{color:var(--win)} .cab.inside{color:var(--ins)}
 .cab.lux{color:var(--lux);font-weight:600} .cab.unknown{color:var(--unk)}
 .cab.dragging{opacity:.35}
+.cab.first{font-weight:700}
 .col .foot{margin-top:auto;border-top:1px solid var(--line);padding:6px 4px 7px;text-align:center;
   background:rgba(24,49,73,.75)}
 .col .foot b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -182,6 +204,8 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
     gap:.6mm 2mm;font-variant-numeric:tabular-nums;font-size:var(--numSize,13pt);font-weight:600}
   .strip .nums span{padding:.3mm 0}
   .strip .nums span.lx{text-decoration:underline}
+  .strip .nums span.pf{font-weight:800}
+  .strip .firstline{font-size:9.5pt;font-weight:700;margin:0 0 1.5mm}
   .strip .tot{margin-top:2.5mm;font-size:8.5pt;color:#444}
 
   /* overview table */
@@ -343,9 +367,42 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
   </details>
 
   <!-- rules -->
-  <details class="panel">
-    <summary>The rules — lux weighting and the caps for sign-on and sign-off</summary>
-    <div class="grid3">
+  <details class="panel" id="rulesPanel" open>
+    <summary>Rules — decide who cleans what, before the split runs</summary>
+
+    <div class="presetbar mt">
+      <select id="presetPick" style="width:190px"><option value="">Saved rule sets…</option></select>
+      <button id="presetLoad" class="small">Load</button>
+      <input type="text" id="presetName" placeholder="Name this set" style="max-width:180px">
+      <button id="presetSave" class="small">Save</button>
+      <button id="presetDel" class="small">Delete</button>
+      <span id="presetMsg" style="color:var(--win);font-size:13.5px"></span>
+    </div>
+
+    <div class="row mt">
+      <button id="addZone">+ Area</button>
+      <button id="addHelper">+ Also takes</button>
+      <button id="addPriority">+ Do first</button>
+      <button id="addSkip">+ Skip</button>
+      <button id="addPin">+ Always to</button>
+      <button id="addPair">+ Keep together</button>
+    </div>
+
+    <div id="ruleList" class="mt"></div>
+    <p class="hint" id="coverage" style="margin:12px 0 0"></p>
+
+    <details style="margin-top:14px">
+      <summary>How to write the cabin part of a rule</summary>
+      <p class="hint mt" style="margin-bottom:0">
+        <b>62*</b> every cabin starting 62 &nbsp;·&nbsp; <b>6201-6224</b> a range &nbsp;·&nbsp;
+        <b>7512</b> one cabin &nbsp;·&nbsp; <b>deck 6</b> a whole deck &nbsp;·&nbsp;
+        <b>window</b> / <b>inside</b> / <b>lux</b> a type.
+        Mix them with commas: <b>62*, 63*, 7501-7512</b>.
+        Areas are matched from the top down, so the first area to claim a cabin keeps it.
+      </p>
+    </details>
+
+    <div class="grid3 mt" style="border-top:1px solid var(--line);padding-top:16px">
       <div>
         <label for="luxWeight">A lux cabin counts as this many cabins</label>
         <input type="number" id="luxWeight" min="1" max="5" step="0.5">
@@ -359,10 +416,17 @@ summary{cursor:pointer;color:var(--muted);font-size:14px}
         <input type="number" id="onCabins" min="0">
       </div>
     </div>
-    <p class="hint mt">These are ceilings, not fixed amounts. If the even share for the day is already below the cap, everybody gets the same number and the cap does nothing.</p>
-    <div class="row"><button class="primary" id="saveRules">Save the rules</button>
+    <p class="hint mt">The two caps are ceilings, not fixed amounts. If the even share is already below the cap, everybody gets the same number.</p>
+    <div class="row">
+      <label style="margin:0;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="autoRun"> Split as soon as both lists are loaded
+      </label>
+    </div>
+    <div class="row mt">
+      <button class="primary" id="saveRules">Save the rules</button>
       <button id="resetRules">Back to the original</button>
-      <span id="rulesMsg" style="color:var(--win);font-size:14px"></span></div>
+      <span id="rulesMsg" style="color:var(--win);font-size:14px"></span>
+    </div>
   </details>
 
   <!-- sync -->
@@ -444,11 +508,48 @@ const shipOverrides = () => {
 const saveShip = () => { store.set("cs_ship",JSON.stringify(shipOverrides())); push(); };
 
 /* ============ rules ============ */
-const DEF_RULES={luxWeight:2, offCabins:10, onCabins:10};
+const DEF_RULES={luxWeight:2, offCabins:10, onCabins:10, autoRun:false};
 let RULES={...DEF_RULES};
 try{ Object.assign(RULES, JSON.parse(store.get("cs_rules")||"{}")); }catch(e){}
 const saveRules = () => { store.set("cs_rules",JSON.stringify(RULES)); push(); };
 const weightOf = t => t==="lux" ? RULES.luxWeight : 1;
+
+/* ---- the rule list ---- */
+let LIST=[];
+try{ const s=JSON.parse(store.get("cs_rulelist")||"null"); if(Array.isArray(s)) LIST=s; }catch(e){}
+let PRESETS={};
+try{ const s=JSON.parse(store.get("cs_presets")||"null"); if(s&&typeof s==="object") PRESETS=s; }catch(e){}
+const saveList = () => { store.set("cs_rulelist",JSON.stringify(LIST)); push(); };
+const savePresets = () => { store.set("cs_presets",JSON.stringify(PRESETS)); push(); };
+let ruleSeq=1;
+
+/* "62*, 6301-6316, 7512, deck 6, window" -> a test for one cabin */
+function matcher(str){
+  const tests=[];
+  (str||"").split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean).forEach(tok=>{
+    let m;
+    if((m=tok.match(/^(\d{4})\s*[-\u2013\u2014]\s*(\d{4})$/))){
+      const a=Math.min(+m[1],+m[2]), b=Math.max(+m[1],+m[2]);
+      tests.push(c=>c.n>=a&&c.n<=b);
+    } else if((m=tok.match(/^deck\s*(\d)$/i))){
+      const d=+m[1]; tests.push(c=>Math.floor(c.n/1000)===d);
+    } else if(/^(window|inside|lux)$/i.test(tok)){
+      const t=tok.toLowerCase(); tests.push(c=>c.type===t);
+    } else if((m=tok.match(/^(\d{1,4})\s*[*x]+$/i))){
+      const p=m[1]; tests.push(c=>String(c.n).startsWith(p));
+    } else if(/^\d{4}$/.test(tok)){
+      const v=+tok; tests.push(c=>c.n===v);
+    }
+  });
+  if(!tests.length) return ()=>false;
+  return c => tests.some(t=>t(c));
+}
+const activeRules = k => LIST.filter(r=>r.on!==false && r.type===k && (r.match||"").trim());
+function hits(r){
+  if(!cabins.length) return 0;
+  const f=matcher(r.type==="helper"?r.also:r.match);
+  return cabins.filter(f).length;
+}
 
 /* ============ today's cabins ============ */
 let pdfCabins=[], cabins=[], voyage={};
@@ -458,7 +559,7 @@ const typeOf = n => override[n] || SHIP[n] || "unknown";
 function setCabins(nums){
   const uniq=[...new Set(nums.map(Number))].filter(n=>n>=1000&&n<=9999).sort((a,b)=>a-b);
   cabins=uniq.map(n=>({n,type:typeOf(n)}));
-  renderCabins(); renderTally(); refreshBuild();
+  renderCabins(); renderTally(); refreshBuild(); updateHits();
 }
 function counts(){
   const c={window:0,inside:0,lux:0,unknown:0};
@@ -654,6 +755,113 @@ function renderDb(){
 }
 function flashDb(m){ $("dbMsg").textContent=m; setTimeout(()=>$("dbMsg").textContent="",2500); }
 
+/* ============ the rules UI ============ */
+const KINDS={
+  zone:    {label:"Area",          cls:"zone"},
+  helper:  {label:"Also takes",    cls:"helper"},
+  priority:{label:"Do first",      cls:"priority"},
+  skip:    {label:"Skip",          cls:"skip"},
+  pin:     {label:"Always to",     cls:"pin"},
+  pair:    {label:"Keep together", cls:"pair"}
+};
+function newRule(type){
+  const r={id:"r"+(ruleSeq++)+Date.now().toString(36),type,on:true,match:""};
+  if(type==="zone"){ r.name="New area"; r.crew=""; }
+  if(type==="helper"){ r.also=""; }
+  if(type==="pin"){ r.who=""; }
+  LIST.push(r); saveList(); renderRules();
+}
+function renderRules(){
+  const host=$("ruleList");
+  host.innerHTML="";
+  if(!LIST.length){
+    host.innerHTML='<p class="hint" style="margin:0">No rules yet — the split falls back to one deck per group of crew, which is usually what you want. Add an area rule when a part of the ship needs a set number of people.</p>';
+  }
+  LIST.forEach((r,i)=>{
+    const K=KINDS[r.type]; if(!K) return;
+    const row=document.createElement("div");
+    row.className="rule "+K.cls+(r.on===false?" off":"");
+    row.innerHTML=`<div><input type="checkbox" ${r.on!==false?"checked":""} title="Turn this rule on or off"></div>
+      <div class="kind">${K.label}</div><div class="fields"></div>
+      <div class="tools"><span class="hits"></span>
+        <button title="Move up">&#9650;</button><button title="Move down">&#9660;</button>
+        <button title="Delete" class="rm">&times;</button></div>`;
+    const F=row.querySelector(".fields");
+    const add=(html)=>{ const s=document.createElement("span");
+      s.style.display="flex"; s.style.gap="6px"; s.style.alignItems="center";
+      s.innerHTML=html; F.appendChild(s); return s; };
+    const bind=(el,key,num)=>el.oninput=e=>{
+      r[key]= num ? (e.target.value===""?"":Math.max(0,parseInt(e.target.value,10)||0)) : e.target.value;
+      saveList(); updateHits();
+    };
+
+    if(r.type==="zone"){
+      const a=add(`<label>Name</label><input type="text" value="${esc(r.name||"")}">`);
+      bind(a.querySelector("input"),"name");
+      const b=add(`<label>Cabins</label><input type="text" class="wide" value="${esc(r.match||"")}" placeholder="62*, 63*">`);
+      bind(b.querySelector("input"),"match");
+      const c=add(`<label>Crew</label><input type="number" min="0" value="${r.crew===""||r.crew==null?"":r.crew}" placeholder="auto">`);
+      bind(c.querySelector("input"),"crew",true);
+    }
+    if(r.type==="helper"){
+      const a=add(`<label>Whoever cleans</label><input type="text" class="wide" value="${esc(r.match||"")}" placeholder="62*">`);
+      bind(a.querySelector("input"),"match");
+      const b=add(`<label>also takes</label><input type="text" class="wide" value="${esc(r.also||"")}" placeholder="7501-7512">`);
+      bind(b.querySelector("input"),"also");
+    }
+    if(r.type==="priority"||r.type==="skip"||r.type==="pair"){
+      const ph={priority:"73*",skip:"5001-5004",pair:"62*, 63*"}[r.type];
+      const a=add(`<label>Cabins</label><input type="text" class="wide" value="${esc(r.match||"")}" placeholder="${ph}">`);
+      bind(a.querySelector("input"),"match");
+      const note={priority:"listed first on the slip",skip:"left off today's list",
+                  pair:"never split between two people"}[r.type];
+      add(`<small style="color:var(--muted)">${note}</small>`);
+    }
+    if(r.type==="pin"){
+      const a=add(`<label>Cabins</label><input type="text" class="wide" value="${esc(r.match||"")}" placeholder="82*">`);
+      bind(a.querySelector("input"),"match");
+      const names=namedCrew().map(p=>p.name);
+      const b=add(`<label>go to</label><select><option value="">choose…</option>${
+        names.map(n=>`<option value="${esc(n)}"${r.who===n?" selected":""}>${esc(n)}</option>`).join("")}
+        ${r.who&&!names.includes(r.who)?`<option value="${esc(r.who)}" selected>${esc(r.who)} (not on today)</option>`:""}</select>`);
+      b.querySelector("select").onchange=e=>{ r.who=e.target.value; saveList(); };
+    }
+
+    const [chk]=row.querySelectorAll("input[type=checkbox]");
+    chk.onchange=e=>{ r.on=e.target.checked; saveList(); renderRules(); };
+    const btns=row.querySelectorAll(".tools button");
+    btns[0].onclick=()=>{ if(i>0){ LIST.splice(i-1,0,LIST.splice(i,1)[0]); saveList(); renderRules(); } };
+    btns[1].onclick=()=>{ if(i<LIST.length-1){ LIST.splice(i+1,0,LIST.splice(i,1)[0]); saveList(); renderRules(); } };
+    btns[2].onclick=()=>{ LIST.splice(i,1); saveList(); renderRules(); };
+    host.appendChild(row);
+  });
+  updateHits();
+}
+function updateHits(){
+  document.querySelectorAll(".rule").forEach((row,i)=>{
+    const r=LIST[i]; if(!r) return;
+    const el=row.querySelector(".hits");
+    el.textContent = cabins.length ? hits(r)+" today" : "";
+  });
+  // which cabins no area rule claims
+  const cov=$("coverage");
+  if(!cabins.length){ cov.textContent=""; return; }
+  const zones=activeRules("zone");
+  if(!zones.length){ cov.textContent="No area rules — the ship is split one deck per group of crew."; return; }
+  const claimed=new Set();
+  zones.forEach(z=>{ const f=matcher(z.match); cabins.forEach(c=>{ if(f(c)) claimed.add(c.n); }); });
+  const left=cabins.filter(c=>!claimed.has(c.n)&&c.type!=="lux").length;
+  cov.textContent = left
+    ? claimed.size+" cabins claimed by your areas · the other "+left+" are split by deck as usual."
+    : "Every cabin today is covered by an area rule.";
+}
+function renderPresets(){
+  const sel=$("presetPick");
+  const keys=Object.keys(PRESETS).sort();
+  sel.innerHTML='<option value="">Saved rule sets…</option>'+
+    keys.map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join("");
+}
+
 /* ============ crew ============ */
 const ROLES=[["full","Full day"],["off","Sign-off"],["on","Sign-on"]];
 let crew=[];
@@ -841,6 +1049,8 @@ function applyRoster(){
   saveCrew(); renderCrew(); refreshBuild();
   if(counts().lux) applyLuxCount(autoLuxCount());
   $("rosterMsg").textContent=crew.length+" crew loaded for day "+d+(roster.month?" of "+roster.month:"")+".";
+  renderRules();
+  if(RULES.autoRun && cabins.length) buildPlan();
 }
 
 /* ============ the split ============ */
@@ -876,6 +1086,56 @@ function apportion(total,weights){
 
 let plan=null;
 const deckOf = n => Math.floor(n/1000);
+const groupOf = c => c.type==="window" ? "window" : c.type==="lux" ? "lux" : "inside";
+const unitsOf = list => list.reduce((s,c)=>s+weightOf(c.type),0);
+
+/* Split one area between its own crew: equal numbers, equal mix of window
+   and inside, and rounded per person so a cap can never be overshot. */
+function fillArea(area, g, people, lists, targets){
+  if(!g.length) return;
+  const w=computeTargets(unitsOf(area.cabins), g.map(i=>capOf(people[i])));
+  g.forEach((i,j)=>targets[i]=Math.round(w[j]));
+  const totals={window:0,inside:0,lux:0};
+  area.cabins.forEach(c=>totals[groupOf(c)]++);
+  let quota;
+  if(!totals.lux){
+    const per=apportion(area.cabins.length, w);
+    const win=apportion(totals.window, per.map(v=>v||0.001));
+    per.forEach((v,j)=>{ if(win[j]>v) win[j]=v; });
+    let short=totals.window-win.reduce((a,b)=>a+b,0);
+    for(let pass=0; short>0 && pass<=area.cabins.length; pass++)
+      for(let j=0;j<per.length&&short>0;j++) if(win[j]<per[j]){ win[j]++; short--; }
+    quota={window:win, inside:per.map((v,j)=>v-win[j]), lux:per.map(()=>0)};
+  } else {
+    quota={};
+    ["window","inside","lux"].forEach(k=>quota[k]=apportion(totals[k],w));
+  }
+  // keep-together groups go to one person, everything else in ship order
+  const pairs=activeRules("pair").map(r=>matcher(r.match));
+  const glued=new Map();
+  area.cabins.forEach(c=>{
+    const k=pairs.findIndex(f=>f(c));
+    if(k>=0) glued.set(k,(glued.get(k)||[]).concat([c]));
+  });
+  const done=new Set();
+  glued.forEach(list=>{
+    let best=0,room=-1;
+    for(let j=0;j<g.length;j++){
+      const r=quota.window[j]+quota.inside[j]+quota.lux[j];
+      if(r>room){ room=r; best=j; }
+    }
+    list.forEach(c=>{ lists[g[best]].push(c); done.add(c.n);
+      const k=groupOf(c); if(quota[k][best]>0) quota[k][best]--; });
+  });
+  area.cabins.forEach(c=>{
+    if(done.has(c.n)) return;
+    const k=groupOf(c);
+    for(let j=0;j<g.length;j++){
+      if(quota[k][j]>0){ quota[k][j]--; lists[g[j]].push(c); return; }
+    }
+    lists[g[g.length-1]].push(c);
+  });
+}
 
 function buildPlan(){
   const people=namedCrew().map(c=>({...c}));
@@ -883,115 +1143,160 @@ function buildPlan(){
   const lists=people.map(()=>[]);
   const targets=new Array(N).fill(0);
 
-  const luxCabins=cabins.filter(c=>c.type==="lux");
+  // rule: skip — these cabins are not cleaned today
+  const skips=activeRules("skip").map(r=>matcher(r.match));
+  let live=cabins.filter(c=>!skips.some(f=>f(c)));
+
+  // lux crew, as set on the crew table
+  const luxCabins=live.filter(c=>c.type==="lux");
   let luxIdx=people.map((p,i)=>p.lux?i:-1).filter(i=>i>=0);
   if(!luxCabins.length) luxIdx=[];
-  if(luxCabins.length && !luxIdx.length){          // never spread lux thinly
+  if(luxCabins.length && !luxIdx.length){
     const k=Math.max(1,Math.min(N-1,autoLuxCount()));
     for(let i=N-k;i<N;i++) luxIdx.push(i);
   }
-
-  let pool=cabins, poolIdx=people.map((_,i)=>i);
+  let pool=live, poolIdx=people.map((_,i)=>i);
   if(luxIdx.length){
     const w=computeTargets(luxCabins.length, luxIdx.map(i=>capOf(people[i])));
     const q=apportion(luxCabins.length,w);
     let k=0;
     luxIdx.forEach((idx,j)=>{ for(let m=0;m<q[j];m++) lists[idx].push(luxCabins[k++]); targets[idx]=q[j]; });
-    pool=cabins.filter(c=>c.type!=="lux");
+    pool=live.filter(c=>c.type!=="lux");
     poolIdx=people.map((_,i)=>i).filter(i=>!luxIdx.includes(i));
   }
-  if(!poolIdx.length){ plan={people,lists,targets}; render(); return; }
+  if(!poolIdx.length){ plan={people,lists,targets,skipped:cabins.length-live.length}; render(); return; }
 
-  const groupOf=c=>c.type==="window"?"window":c.type==="lux"?"lux":"inside";
-  const poolUnits=pool.reduce((s,c)=>s+weightOf(c.type),0);
-  const globalT=computeTargets(poolUnits, poolIdx.map(i=>capOf(people[i])));
-  const avgT=poolUnits/poolIdx.length;
-
-  // one deck per group of crew — nobody should be sent up and down stairs
-  let decks=[];
-  [...new Set(pool.map(c=>deckOf(c.n)))].sort((a,b)=>a-b).forEach(d=>{
-    const cs=pool.filter(c=>deckOf(c.n)===d);
-    decks.push({decks:[d], cabins:cs, units:cs.reduce((s,c)=>s+weightOf(c.type),0)});
+  /* ---- build the areas ---- */
+  const areas=[];
+  const taken=new Set();
+  activeRules("zone").forEach(z=>{                       // areas you defined
+    const f=matcher(z.match);
+    const cs=pool.filter(c=>!taken.has(c.n)&&f(c));
+    if(!cs.length) return;
+    cs.forEach(c=>taken.add(c.n));
+    areas.push({name:z.name||"Area", cabins:cs, crew:(z.crew===""||z.crew==null)?null:z.crew});
   });
-  // a deck with too few cabins to keep one person busy joins its neighbour —
-  // this is the only case where somebody works two decks
-  for(let i=0;i<decks.length&&decks.length>1;i++){
-    if(decks[i].units < avgT*0.6){
-      const j = i>0 ? i-1 : 1;
-      decks[j].cabins=decks[j].cabins.concat(decks[i].cabins).sort((a,b)=>a.n-b.n);
-      decks[j].units+=decks[i].units;
-      decks[j].decks=[...new Set([...decks[j].decks,...decks[i].decks])].sort();
-      decks.splice(i,1); i=-1;
+  const rest=pool.filter(c=>!taken.has(c.n));            // the rest, one deck at a time
+  [...new Set(rest.map(c=>deckOf(c.n)))].sort((a,b)=>a-b).forEach(d=>{
+    const cs=rest.filter(c=>deckOf(c.n)===d);
+    areas.push({name:"Deck "+d, cabins:cs, crew:null, auto:true});
+  });
+
+  // rule: also takes — bolt extra cabins onto the area that matched
+  activeRules("helper").forEach(r=>{
+    const who=matcher(r.match), what=matcher(r.also);
+    const host=areas.find(a=>a.cabins.some(who));
+    if(!host) return;
+    areas.forEach(a=>{ if(a!==host) a.cabins=a.cabins.filter(c=>!what(c)); });
+    const extra=pool.filter(c=>what(c)&&!host.cabins.some(x=>x.n===c.n));
+    host.cabins=host.cabins.concat(extra).sort((a,b)=>a.n-b.n);
+  });
+  areas.forEach(a=>{ a.units=unitsOf(a.cabins); });
+  let live_areas=areas.filter(a=>a.cabins.length);
+
+  // an automatic deck too small to keep one person busy joins its neighbour
+  const avgT=unitsOf(pool)/poolIdx.length;
+  for(let i=0;i<live_areas.length&&live_areas.length>1;i++){
+    const a=live_areas[i];
+    if(a.auto && a.crew===null && a.units<avgT*0.6){
+      const j=i>0?i-1:1;
+      live_areas[j].cabins=live_areas[j].cabins.concat(a.cabins).sort((x,y)=>x.n-y.n);
+      live_areas[j].units+=a.units;
+      live_areas[j].name+=" + "+a.name.replace(/^Deck /,"");
+      live_areas.splice(i,1); i=-1;
     }
   }
+  live_areas.sort((a,b)=>Math.min(...a.cabins.map(c=>c.n))-Math.min(...b.cabins.map(c=>c.n)));
 
-  // hand the crew out to the decks in order, by how much work each deck holds
-  const groups=decks.map(()=>[]);
+  /* ---- hand the crew out to the areas, in ship order ---- */
+  const globalT=computeTargets(unitsOf(pool), poolIdx.map(i=>capOf(people[i])));
+  const stillNeeded=k=>{
+    let s=0;
+    for(let j=k+1;j<live_areas.length;j++)
+      s += live_areas[j].crew!==null ? Math.max(1,live_areas[j].crew) : 1;
+    return s;
+  };
   let ci=0;
-  decks.forEach((dk,di)=>{
-    const left=decks.length-di-1;
-    if(di===decks.length-1){ while(ci<poolIdx.length) groups[di].push(poolIdx[ci++]); return; }
-    let need=dk.units;
-    while(ci<poolIdx.length-left){
+  live_areas.forEach((a,idx)=>{
+    a.crewIdx=[];
+    const reserve=Math.min(stillNeeded(idx), Math.max(0,poolIdx.length-ci-1));
+    if(a.crew!==null){                              // you asked for a set number
+      const want=Math.max(1,Math.min(a.crew, poolIdx.length-ci-reserve));
+      for(let k=0;k<want&&ci<poolIdx.length;k++) a.crewIdx.push(poolIdx[ci++]);
+      return;
+    }
+    let need=a.units;                               // otherwise, by how much work it holds
+    while(ci<poolIdx.length-reserve){
       const t=globalT[ci]||avgT;
-      if(groups[di].length && need < t*0.5) break;
-      groups[di].push(poolIdx[ci]); need-=t; ci++;
+      if(a.crewIdx.length && need<t*0.5) break;
+      a.crewIdx.push(poolIdx[ci]); need-=t; ci++;
     }
-    if(!groups[di].length && ci<poolIdx.length-left) groups[di].push(poolIdx[ci++]);
+    if(!a.crewIdx.length && ci<poolIdx.length) a.crewIdx.push(poolIdx[ci++]);
   });
+  const headCount=live_areas.map(a=>a.crewIdx.length);
+  while(ci<poolIdx.length){                         // anyone spare joins the last open area
+    let k=-1;
+    for(let j=live_areas.length-1;j>=0;j--) if(live_areas[j].crew===null){ k=j; break; }
+    headCount[k<0?live_areas.length-1:k]++; ci++;
+  }
 
-  // split each deck among its own crew, window and inside evenly
-  decks.forEach((dk,di)=>{
-    const g=groups[di];
-    if(!g.length) return;
-    const w=computeTargets(dk.units, g.map(i=>capOf(people[i])));
-    g.forEach((i,j)=>targets[i]=Math.round(w[j]));
-    const totals={window:0,inside:0,lux:0};
-    dk.cabins.forEach(c=>totals[groupOf(c)]++);
+  // People are handed out from the top of your crew list downwards, so the
+  // printed order runs along the ship. Then even out the head count until the
+  // heaviest day on any area is as light as it can be — this is what stops a
+  // capped sign-off from leaving two people on an area doing everyone's share.
+  const seat=()=>{ let s=0; live_areas.forEach((a,i)=>{ a.crewIdx=[];
+    for(let k=0;k<headCount[i]&&s<poolIdx.length;k++) a.crewIdx.push(poolIdx[s++]); }); };
+  const peaks=()=>live_areas.map(a=>a.crewIdx.length
+    ? Math.max(...computeTargets(a.units, a.crewIdx.map(i=>capOf(people[i])))) : 0);
+  seat();
+  for(let it=0; it<poolIdx.length*2; it++){
+    const p=peaks(), worst=Math.max(...p);
+    let hi=-1, lo=-1;
+    live_areas.forEach((a,i)=>{ if(a.crew!==null) return;
+      if(hi<0||p[i]>p[hi]) hi=i;
+      if(headCount[i]>1 && (lo<0||p[i]<p[lo])) lo=i; });
+    if(hi<0||lo<0||hi===lo||p[hi]-p[lo]<=1) break;
+    headCount[hi]++; headCount[lo]--; seat();
+    if(Math.max(...peaks())>=worst){ headCount[hi]--; headCount[lo]++; seat(); break; }
+  }
+  live_areas.forEach(a=>fillArea(a,a.crewIdx,people,lists,targets));
 
-    let quota;
-    if(!totals.lux){
-      // decide how many cabins each person gets first, then how many of those
-      // have windows — so the rounding can never push anyone over their cap
-      const per=apportion(dk.cabins.length, w);
-      const win=apportion(totals.window, per.map(v=>v||0.001));
-      per.forEach((v,j)=>{ if(win[j]>v) win[j]=v; });
-      let short=totals.window-win.reduce((a,b)=>a+b,0);
-      for(let pass=0; short>0 && pass<dk.cabins.length; pass++){
-        for(let j=0;j<per.length&&short>0;j++) if(win[j]<per[j]){ win[j]++; short--; }
-      }
-      quota={window:win, inside:per.map((v,j)=>v-win[j]), lux:per.map(()=>0)};
-    } else {
-      quota={};
-      ["window","inside","lux"].forEach(k=>quota[k]=apportion(totals[k],w));
-    }
-
-    dk.cabins.forEach(c=>{
-      const k=groupOf(c);
-      for(let j=0;j<g.length;j++){
-        if(quota[k][j]>0){ quota[k][j]--; lists[g[j]].push(c); return; }
-      }
-      lists[g[g.length-1]].push(c);
+  /* ---- rule: always to — move those cabins to the named person ---- */
+  activeRules("pin").forEach(r=>{
+    const j=people.findIndex(p=>p.name===r.who);
+    if(j<0) return;
+    const f=matcher(r.match);
+    lists.forEach((l,k)=>{
+      if(k===j) return;
+      for(let m=l.length-1;m>=0;m--) if(f(l[m])) lists[j].push(l.splice(m,1)[0]);
     });
   });
 
-  plan={people,lists,targets};
+  /* ---- rule: do first ---- */
+  const prio=activeRules("priority").map(r=>matcher(r.match));
+  const isPrio=c=>prio.some(f=>f(c));
+  lists.forEach(l=>l.forEach(c=>{ c.first=isPrio(c); }));
+
+  const areaOf={};
+  live_areas.forEach(a=>a.crewIdx.forEach(i=>areaOf[i]=a.name));
+  plan={people,lists,targets,areaOf,skipped:cabins.length-live.length};
   render();
 }
 
 /* ============ board ============ */
+const sortList = l => l.slice().sort((a,b)=>(b.first?1:0)-(a.first?1:0)||a.n-b.n);
 function render(){
   const board=$("board");
   board.innerHTML="";
   plan.people.forEach((p,idx)=>{
-    const list=plan.lists[idx].sort((a,b)=>a.n-b.n);
+    const list=sortList(plan.lists[idx]);
     const col=document.createElement("div");
     col.className="col"; col.dataset.idx=idx;
     const box=document.createElement("div");
     box.className="cabs";
     list.forEach(c=>{
       const d=document.createElement("div");
-      d.className="cab "+c.type; d.textContent=c.n;
+      d.className="cab "+c.type+(c.first?" first":""); d.textContent=(c.first?"\u2605 ":"")+c.n;
       d.draggable=true; d.dataset.n=c.n; d.title=LABEL[c.type];
       box.appendChild(d);
     });
@@ -1004,7 +1309,7 @@ function render(){
     const foot=document.createElement("div");
     foot.className="foot";
     foot.innerHTML=`<b>${esc(p.name)}</b>
-      <small class="${decks.length>1?"off":""}">${decks.length?"Deck "+decks.join(" + "):"—"}</small>
+      <small class="${decks.length>1?"off":""}">${esc((plan.areaOf&&plan.areaOf[idx])||(decks.length?"Deck "+decks.join(" + "):"—"))}</small>
       <small class="${Math.abs(list.length-t)>1?"off":""}">${list.length} of ${t}</small>
       <small>${w}w ${i}i${l?" "+l+"L":""}</small>`;
     col.appendChild(foot);
@@ -1056,16 +1361,17 @@ function buildPrint(){
 
   let h=`<div class="strips" style="grid-template-columns:repeat(${perRow},1fr)">`;
   plan.people.forEach((p,i)=>{
-    const list=plan.lists[i].sort((a,b)=>a.n-b.n);
+    const list=sortList(plan.lists[i]);
     const w=list.filter(c=>c.type==="window").length;
     const ins=list.filter(c=>c.type!=="window"&&c.type!=="lux").length;
     const lx=list.filter(c=>c.type==="lux").length;
     const decks=[...new Set(list.map(c=>deckOf(c.n)))].sort();
     h+=`<div class="strip">
       <p class="who">${esc(p.name)}</p>
-      <p class="deck">${decks.length?"DECK "+decks.join(" + "):""}</p>
+      <p class="deck">${esc(((plan.areaOf&&plan.areaOf[i])||(decks.length?"Deck "+decks.join(" + "):"")).toUpperCase())}</p>
       <p class="meta">${esc(voyageLine())}</p>
-      <div class="nums">${list.map(c=>`<span class="${c.type==="lux"?"lx":""}">${c.n}</span>`).join("")}</div>
+      ${list.some(c=>c.first)?`<p class="firstline">Do first: ${list.filter(c=>c.first).map(c=>c.n).join(", ")}</p>`:""}
+      <div class="nums">${list.map(c=>`<span class="${c.type==="lux"?"lx":""}${c.first?" pf":""}">${c.first?"\u2605":""}${c.n}</span>`).join("")}</div>
       <p class="tot">${list.length} cabins &nbsp;·&nbsp; ${w} window, ${ins} inside${lx?", "+lx+" lux":""}</p>
     </div>`;
   });
@@ -1133,7 +1439,7 @@ function push(){
   clearTimeout(pushTimer);
   pushTimer=setTimeout(async()=>{
     try{
-      const body={ship:shipOverrides(), rules:RULES, crew, updated:new Date().toISOString()};
+      const body={ship:shipOverrides(), rules:RULES, ruleList:LIST, presets:PRESETS, crew, updated:new Date().toISOString()};
       const r=await fetch(syncEndpoint(),{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       if(!r.ok) throw new Error(r.status+" "+r.statusText);
       flash("syncMsg","Saved to the database.");
@@ -1149,7 +1455,10 @@ async function pull(quiet){
     if(!d){ if(!quiet) flash("syncMsg","Nothing stored there yet."); return; }
     if(d.ship){ SHIP={...SHIP_DEFAULT,...d.ship}; store.set("cs_ship",JSON.stringify(d.ship)); renderDb(); }
     if(d.rules){ Object.assign(RULES,d.rules); store.set("cs_rules",JSON.stringify(RULES)); fillRules(); }
+    if(Array.isArray(d.ruleList)){ LIST=d.ruleList; store.set("cs_rulelist",JSON.stringify(LIST)); }
+    if(d.presets&&typeof d.presets==="object"){ PRESETS=d.presets; store.set("cs_presets",JSON.stringify(PRESETS)); renderPresets(); }
     if(Array.isArray(d.crew)&&d.crew.length){ crew=d.crew; store.set("cs_crew",JSON.stringify(crew)); renderCrew(); }
+    renderRules();
     if(cabins.length) setCabins(cabins.map(c=>c.n));
     refreshBuild();
     flash("syncMsg","Loaded"+(d.updated?" — last saved "+d.updated.slice(0,16).replace("T"," "):"")+".");
@@ -1233,7 +1542,36 @@ function fillRules(){
   $("luxWeight").value=RULES.luxWeight;
   $("offCabins").value=RULES.offCabins;
   $("onCabins").value=RULES.onCabins;
+  $("autoRun").checked=!!RULES.autoRun;
 }
+$("addZone").onclick    =()=>newRule("zone");
+$("addHelper").onclick  =()=>newRule("helper");
+$("addPriority").onclick=()=>newRule("priority");
+$("addSkip").onclick    =()=>newRule("skip");
+$("addPin").onclick     =()=>newRule("pin");
+$("addPair").onclick    =()=>newRule("pair");
+$("autoRun").onchange=e=>{ RULES.autoRun=e.target.checked; saveRules(); };
+
+$("presetSave").onclick=()=>{
+  const n=$("presetName").value.trim();
+  if(!n){ flash("presetMsg","Give the set a name first."); return; }
+  PRESETS[n]=JSON.parse(JSON.stringify(LIST));
+  savePresets(); renderPresets(); $("presetPick").value=n;
+  flash("presetMsg","Saved as \u201c"+n+"\u201d.");
+};
+$("presetLoad").onclick=()=>{
+  const n=$("presetPick").value;
+  if(!n||!PRESETS[n]){ flash("presetMsg","Pick a set first."); return; }
+  LIST=JSON.parse(JSON.stringify(PRESETS[n]));
+  saveList(); renderRules(); $("presetName").value=n;
+  flash("presetMsg","\u201c"+n+"\u201d loaded.");
+};
+$("presetDel").onclick=()=>{
+  const n=$("presetPick").value;
+  if(!n||!PRESETS[n]) return;
+  delete PRESETS[n]; savePresets(); renderPresets();
+  flash("presetMsg","Deleted.");
+};
 $("saveRules").onclick=()=>{
   RULES.luxWeight=parseFloat($("luxWeight").value)||2;
   RULES.offCabins=Math.max(0,parseInt($("offCabins").value,10)||0);
@@ -1241,7 +1579,10 @@ $("saveRules").onclick=()=>{
   saveRules(); renderCrew(); refreshBuild();
   flash("rulesMsg","Saved.");
 };
-$("resetRules").onclick=()=>{ RULES={...DEF_RULES}; saveRules(); fillRules(); renderCrew(); refreshBuild(); flash("rulesMsg","Back to the original."); };
+$("resetRules").onclick=()=>{
+  RULES={...DEF_RULES}; saveRules(); fillRules(); renderCrew(); refreshBuild();
+  flash("rulesMsg","Caps and weighting are back to the original. Your rule list is untouched.");
+};
 
 $("syncUrl").value=SYNC.url; $("syncPath").value=SYNC.path; $("syncToken").value=SYNC.token;
 $("syncSave").onclick=()=>{
@@ -1258,7 +1599,7 @@ $("syncPull").onclick=()=>{
 };
 $("syncOff").onclick=()=>{ SYNC.on=false; store.set("cs_on","0"); syncPill(); flash("syncMsg","Turned off — saving in this browser only."); };
 
-loadCrew(); renderCrew(); renderDb(); fillRules(); syncPill(); refreshBuild();
+loadCrew(); renderCrew(); renderDb(); fillRules(); renderRules(); renderPresets(); syncPill(); refreshBuild();
 if(SYNC.on&&SYNC.url) pull(true);
 </script>
 </body>
